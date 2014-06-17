@@ -1,0 +1,83 @@
+modules {
+  module {
+    name = "infiniband"
+    language = "python"
+    param "interval" {
+       value = "20"
+    }
+    param "error_metrics" {
+       value = "yes"
+    }
+  }
+}
+
+collection_group {
+  collect_every = 15
+  time_threshold = 45
+  metric { 
+    name_match = "infiniband_xmtdata_port" 
+    title = "Infiniband Send Bytes"
+  }
+  metric { 
+    name_match = "infiniband_rcvdata_port" 
+    title = "Infiniband Received Bytes"
+  }    
+  metric { 
+    name_match = "infiniband_xmtpkts_port" 
+    title = "Infiniband Send Packages"
+  }
+  metric { 
+    name_match = "infiniband_rcvpkts_port" 
+    title = "Infiniband Received Packages"
+  }
+  metric { 
+    name_match = "infiniband_linkdowned_port" 
+    title = "Infiniband LinkDowned"
+  }
+  metric { 
+    name_match = "infiniband_rcverrors_port" 
+    title = "Infiniband RcvErrors"
+  }
+  metric { 
+    name_match = "infiniband_xmtdiscards_port" 
+    title = "Infiniband XmtDiscards"
+  }    
+  metric { 
+    name_match = "infiniband_rcvswrelayerrors_port" 
+    title = "Infiniband RcvSwRelayErrors"
+  }
+  metric { 
+    name_match = "infiniband_linkintegrityerrors_port" 
+    title = "Infiniband LinkIntegrityErrors"
+  }
+  metric { 
+    name_match = "infiniband_excbufoverrunerrors_port" 
+    title = "Infiniband ExcBufOverrunErrors"
+  }
+  metric { 
+    name_match = "infiniband_rcvremotephyserrors_port" 
+    title = "Infiniband RcvRemotePhysErrors"
+  }
+  metric { 
+    name_match = "infiniband_symbolerrors_port" 
+    title = "Infiniband SymbolErrors"
+  }
+  metric { 
+    name_match = "infiniband_linkrecovers_port" 
+    title = "Infiniband LinkRecovers"
+  }
+  metric { 
+    name_match = "infiniband_rcvconstrainterrors_port" 
+    title = "Infiniband RcvConstraintErrors"
+  }
+  metric { 
+    name_match = "infiniband_vl15dropped_port" 
+    title = "Infiniband VL15Dropped"
+  }
+  metric { 
+    name_match = "infiniband_xmtconstrainterrors_port" 
+    title = "Infiniband XmtConstraintErrors"
+  }
+}
+
+

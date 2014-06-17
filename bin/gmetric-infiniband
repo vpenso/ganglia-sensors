@@ -1,0 +1,352 @@
+#!/usr/bin/env ruby
+#
+# Copyright 2014 Victor Penso
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+require 'rubygems'
+require 'ostruct'
+require 'logger'
+require 'getoptlong' 
+require 'socket'
+require 'json'
+
+module System
+
+  def self.command?(command)
+    `which #{command}`
+    return true if $?.success?
+    return false
+  end
+
+  def self.command(command)
+    if $options.debug
+      $logger.debug "Executing: [#{command}]"
+    else
+     `#{command}`
+     unless $?.success?
+       $logger.fatal "Filed to execute [#{command}]"
+       raise
+     end
+    end
+  end
+
+end
+
+module Infiniband
+
+  # Uses the Infiniband tool ibstat to retrieve a list of ports including
+  # their base LID. 
+  #
+  # Return: Hash with port number as key, and LID as value
+  def self.ports
+    raise("Command [ibstat] not in path!") unless System.command? 'ibstat'
+    list = Hash.new
+    ibstat = `ibstat`.split("\n")
+    ibstat.each_index do |i|
+      line = ibstat[i].lstrip.chop
+      if line =~ /^Port [0-9]*$/
+        number = line.delete(':').gsub(/Port /,'')
+        lid = ibstat[i+4].lstrip.split(':')[1].lstrip
+        list[number] = lid
+      end
+    end
+    return list
+  end
+
+  # Return: Hash containing the Infiniband interface performance
+  # metrics, for a given LID on port
+  def self.metrics(lid,port=1)
+    data = { :rbytes => 0, :tbytes => 0, :rpkts => 0, :tpkts => 0 }
+    # read the perfquery manual for more information
+    command = %Q[sudo /usr/sbin/perfquery -r #{lid} #{port} 0xf000]
+    # clean all read counters, except of error counts
+    `#{command}`.split("\n").each do |line|
+      case line
+      when /^RcvPkts/ # received packets
+        data[:rpkts] = value(line)
+      when /^XmtPkts/ # transmitted packets
+        data[:tpkts] = value(line)
+      when /^RcvData/ # received bytes
+        data[:rbytes] = value(line) * 4 # result in octets
+      when /^XmtData/ # transmitted bytes
+        data[:tbytes] = value(line) * 4 # result in octets
+      when /^SymbolErrors/
+        data[:symerr] = value(line)
+      when /^LinkRecovers/
+        data[:linkrec] = value(line)
+      when /^LinkDowned/
+        data[:linkdown] = value(line)
+      when /^RcvErrors/
+        data[:rerrors] = value(line)
+      when /^RcvRemotePhysErrors/
+        data[:rphyserrors] = value(line)
+      when /^RcvSwRelayErrors/
+        data[:rrelerrors] = value(line)
+      when /^XmtDiscards/
+        data[:xmtd] = value(line)
+      when /^XmtConstraintErrors/
+        data[:xmtcerrors] = value(line)
+      when /^RcvConstraintErrors/
+        data[:rcerrors] = value(line)
+      when /^LinkIntegrityErrors/
+        data[:linkerrors] = value(line)
+      when /^ExcBufOverrunErrors/
+        data[:buferrors] = value(line)
+      when /^VL15Dropped/
+        data[:vdropped] = value(line)
+      end
+    end
+    return data
+  end
+
+  def self.value(line)
+    line.delete('.').split(':')[1].to_i
+  end
+
+end
+
+class Ganglia
+
+  def initialize 
+    raise("Command [gmetric] not in path!") unless System.command? 'gmetric'
+  end
+
+  def gmetric
+    # Operate on all available Infiniband ports
+    Infiniband::ports.each_pair do |port,lid|
+
+      # clean the counters
+      trash = Infiniband::metrics(lid,port)      
+      sleep(1) # accumulate counters for one second
+
+      # read the metrics 
+      data = Infiniband::metrics(lid,port)
+
+      args = "--type=uint32 --group infiniband"
+      send_metrics = Array.new
+
+      # Write network traffic metrics to Ganglia
+      default_metrics =  %w(rbytes tbytes rpkts tpkts)
+      default_metrics.each do |metric|
+        System::command "gmetric #{args} --units=bytes/sec --name=ib_port#{port}_#{metric} --value=#{data[metric.to_sym]}"
+      end
+
+      send_metrics += default_metrics
+     
+      # Write error counters to Ganglia
+      if $options.error_counters
+        error_metrics = %w(symerr linkrec linkdown linkerrors rerrors rphyserrors buferrors vdropped xmtd)
+        error_metrics.each do |metric|
+          System::command "gmetric #{args} --name=ib_port#{port}_#{metric} --value=#{data[metric.to_sym]}"
+        end
+        send_metrics += error_metrics
+      end
+      
+      $logger.info "Send metrics: #{send_metrics.join(' ')}"
+      
+    end
+  end
+
+end
+
+
+
+
+exec_name = File.split(__FILE__)[-1]
+HELP = <<EOF
+Send Infiniband network metrics to Gagnlia. 
+
+  #{exec_name} [-dDeho] [-i sec] [-l path]
+     [-L level] [-p path]
+
+Usage
+-----
+
+Read metrics from Infiniband using `ibstat` and `perfquery`,
+and sends these to Ganglia using `gmetric`. Executes in an
+endless loop by default, and can be started as daemon 
+optionally.
+
+Options
+-------
+
+  --debug, -d
+    Show stacktraces in case of errors.
+  --daemonize, -D 
+    Background daemon process.
+  --error-counters, -e
+    Send accumulating error counters:
+      SymbolErrors
+      LinkRecovers
+      LinkDowned
+      LinkIntegrityErrors
+      RcvErrors
+      RcvRemotePhysErrors
+      ExcBufOverrunErrors
+      VL15Dropped
+      XmtDiscards
+  --interval, -i SECONDS
+    Time interval to send data to Ganglia (default = 20).
+  --help, -h
+    Show this help information.
+  --log-file, -l PATH:
+    Path to the log file when executed as daemon (defaults
+    to /var/log/#{exec_name}.log).
+  --log-level, -L debug|info|warn|fatal
+    Verbosity of the logging output.
+  --once, -o
+    Send the metrics once to Ganglia.
+  --pid-file, -p PATH:
+    Path to a file storing the process ID when executed as 
+    daemon (default to /var/run/#{exec_name}.pid)
+  --version, v
+    Print program version.
+EOF
+
+begin
+
+  # Unlikely to be used by a daemon 
+  #stdin = $stdin.tty? ? String.new : $stdin.read
+
+  $DEBUG = false
+
+  $options = OpenStruct.new
+  $options.debug = false
+  $options.interval = 300
+  $options.daemonize = false
+  $options.pid_file = "/var/run/#{exec_name}.pid"
+  $options.log_file = "/var/log/#{exec_name}.log"
+  
+  $options.error_counters = false
+  $options.interval = 20
+  $options.once = false
+
+  $logger = Logger.new(STDOUT)
+  # Adjust the time format used for the logger
+  $logger.datetime_format = "%Y-%m-%dT%H:%M:%S"
+  $logger.formatter = proc do |severity, datetime, progname, message|
+    "[#{datetime.strftime($logger.datetime_format)}] #{severity} -- #{message}\n"
+  end
+
+  $logger.level = Logger::INFO
+
+  GetoptLong.new(
+    ['--daemonize','-D',GetoptLong::NO_ARGUMENT],
+    ['--error-counters','-e',GetoptLong::NO_ARGUMENT],
+    ['--once','-o',GetoptLong::NO_ARGUMENT],
+    ['--interval','-i',GetoptLong::REQUIRED_ARGUMENT],
+    ['--pid-file','-p',GetoptLong::REQUIRED_ARGUMENT],
+    ['--log-file','-l',GetoptLong::REQUIRED_ARGUMENT],
+    ['--log-level','-L',GetoptLong::REQUIRED_ARGUMENT],
+    ['--version','-v',GetoptLong::NO_ARGUMENT],
+    ['--debug','-d',GetoptLong::NO_ARGUMENT],
+    ['--help','-h',GetoptLong::NO_ARGUMENT]
+  ).each do |opt,arg|
+    case opt
+    when '--error-counters'
+      $options.error_counters = true
+    when '--interval'
+      $options.interval = arg
+    when '--once'
+      $options.once = true
+    when '--pid-file'
+      $options.pid_file = arg
+    when '--log-file'
+      $options.log_file = arg
+    when '--log-level'
+      $logger.level = case arg
+         when 'warn'
+           Logger::WARN
+         when 'debug'
+           Logger::DEBUG
+         when 'fatal'
+           Logger::FATAL
+         else
+           Logger::INFO
+         end
+      $options.debug = true if arg == 'debug'
+    when '--version'
+      $stdout.puts 0.1
+      exit 0
+    when '--debug'
+      $options.debug = true
+      $logger.level = Logger::DEBUG
+    when '--help'
+      $stdout.puts HELP
+      exit 0
+    end
+  end
+
+  shutdown = false
+
+  Signal.trap('TERM') do
+    $logger.info "Service terminated."
+    exit 0
+  end
+  Signal.trap('INT') do
+    $logger.info "Wait for shutdown..."
+    shutdown = true
+  end
+ 
+  if $options.daemonize
+    if RUBY_VERSION < '1.9'
+      exit if fork
+      Process.setsid
+      exit if fork
+      Dir.chdir '/'
+    else
+      Process.daemon
+    end
+    # Write the process ID to a file
+    File.open($options.pid_file,'w') { |file| file.write "#{$$}\n"}
+    # Bind output to a log file
+    $stdin.reopen '/dev/null'
+    $stdout.reopen($options.log_file,'w')
+    $stdout.sync = true
+    $stderr.reopen($stdout)
+  end
+
+  ganglia = Ganglia.new
+
+  if $options.once
+    ganglia.gmetric
+  # Dive into an endless loop
+  else
+    while(true)
+      break if shutdown
+      # Send Infiniband network metrics to Ganglia
+      ganglia.gmetric
+      # Wait for time period to elapse 
+      sleep $options.interval - 1
+    end
+    $logger.info "Service stopped!"
+  end
+
+rescue => exc
+  $stderr.puts "ERROR: #{exc.message}"
+  $stderr.puts " use -h for detailed instructions"
+  if $options.debug
+    $stderr.puts "Catched: #{exc.class}"
+    $stderr.puts '-- Stack Trace --'
+    $stderr.puts exc.backtrace
+  else
+    $stderr.puts 'You may want run this in debug mode with \'-d\''
+  end
+  exit 1
+end
+
+exit 0

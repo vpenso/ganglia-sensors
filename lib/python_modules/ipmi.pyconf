@@ -1,0 +1,20 @@
+modules {
+  module {
+    name = "ipmi"
+    language = "python"
+    param "interval" {
+       value = "20"
+    }
+  }
+}
+
+collection_group {
+  collect_every = 15
+  time_threshold = 45
+  metric { 
+    name_match = "ipmi_system_temp" 
+    title = "System Temperature"
+  }
+}
+
+
