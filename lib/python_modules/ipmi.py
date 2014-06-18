@@ -22,6 +22,20 @@ import re
 
 data = {}
 
+
+def metric_keys():
+    command = ["sudo","ipmitool","sensor"] 
+    sensors = subprocess.Popen(command, stdout=subprocess.PIPE).stdout.readlines()
+    keys = []
+    for line in sensors:
+        line = line.split('|')
+        key = line[0].strip().lower().replace(" ", "_")
+        state = line[3].strip()
+        if state == "ok": 
+            keys.append(key)
+    return keys
+
+
 def update_metrics(time_max = 20):
     # Buffer for performance metrics
     global data
@@ -34,7 +48,7 @@ def update_metrics(time_max = 20):
             line = line.split('|')
             key = line[0].strip().lower().replace(" ", "_")
             value = line[1].strip()
-            if key == "system_temp":
+            if value != "0x0" and value != "na":
                 data[key] = float(value)
         # Buffer a time stamp of the last time metrics have been recorded 
         data["time"] = time.time()
@@ -62,7 +76,7 @@ def metric_handler(name):
 # module in the gmond.conf file.
 def metric_init(params):
 
-    global perfquery
+    global data
 
     # Initialize the first time stamp in the past to make sure 
     # that the perfquery data gets initialized on first execution
@@ -91,6 +105,21 @@ def metric_init(params):
     # Add this metric to the descriptor list
     descriptors.append(metric)
 
+    if params["fan_speed"] == "yes":
+        for key in metric_keys():
+            pattern = re.compile('^fan[0-9]*')
+            if pattern.match(key):
+                metric               = {}
+                metric["name"]       = group + "_" + key
+                metric["call_back"]  = metric_handler
+                metric["time_max"]   = time_max
+                metric["value_type"] = "float"
+                metric["format"]     = '%.0f'
+                metric["slope"]      = "both"
+                metric["units"]      = "RPM"
+                metric["groups"]     = group
+                descriptors.append(metric)
+
     # Register metrics provided by this module
     return descriptors
 
@@ -104,7 +133,7 @@ def metric_cleanup():
 
 if __name__ == '__main__':
 
-    params = { "interval": "20" }
+    params = { "interval": "20", "fan_speed": "yes" }
 
     descriptors = metric_init(params)
 

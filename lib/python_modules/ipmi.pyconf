@@ -5,6 +5,9 @@ modules {
     param "interval" {
        value = "20"
     }
+    param "fan_speed" {
+       value = "yes"
+    }
   }
 }
 
@@ -14,6 +17,10 @@ collection_group {
   metric { 
     name_match = "ipmi_system_temp" 
     title = "System Temperature"
+  }
+  metric { 
+    name_match = "ipmi_fan" 
+    title = "Fan Speed"
   }
 }
 
