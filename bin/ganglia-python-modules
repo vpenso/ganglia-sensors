@@ -19,6 +19,7 @@
 require 'ostruct'
 require 'getoptlong' 
 require 'logger'
+require 'json'
 
 module CLI
   class Table
@@ -84,7 +85,7 @@ module Ganglia
           list[name] = {:config => file,:state => state}
         end
       end 
-      files.each do |file|
+      module_files().each do |file|
         name = file.split('/')[-1].gsub(/\.py$/,'')
         if list.has_key?(name)
           list[name][:module] = file
@@ -140,8 +141,8 @@ module Ganglia
       return config
     end
 
-    def files
-      pattern = "#{@modules_path}/*.py"
+    def module_files
+      pattern = "#{@module_path}/*.py"
       modules = Array.new
       $logger.info "Search for Python modules [#{pattern}]"
       return Dir.glob(pattern)
@@ -178,6 +179,8 @@ Options
     Show stacktraces in case of errors.
   --help, -h
     Show this help information.
+  --json, -j 
+    Print output in JSON.
   --log-level, -L debug|info|warn|fatal
     Verbosity of the program output.
   --module-path, -m PATH
@@ -191,8 +194,9 @@ begin
   #stdin = $stdin.tty? ? String.new : $stdin.read
 
   options = OpenStruct.new
-  options.debug = false
   options.config_path = '/etc/ganglia/conf.d'
+  options.debug = false
+  options.json = false
   options.module_path = '/usr/lib/ganglia/python_modules'
 
   $logger = Logger.new($stderr)
@@ -207,6 +211,7 @@ begin
     ['--config-path','-c',GetoptLong::REQUIRED_ARGUMENT],
     ['--debug','-d',GetoptLong::NO_ARGUMENT],
     ['--help','-h',GetoptLong::NO_ARGUMENT],
+    ['--json','-j',GetoptLong::NO_ARGUMENT],
     ['--log-level','-L',GetoptLong::REQUIRED_ARGUMENT],
     ['--module-path','-m',GetoptLong::REQUIRED_ARGUMENT],
     ['--version','-v',GetoptLong::NO_ARGUMENT]
@@ -220,6 +225,8 @@ begin
     when '--help'
       $stdout.puts HELP
       exit 0
+    when '--json'
+      options.json = true
     when '--log-level'
       $logger.level = case arg
       when 'warn'
@@ -251,11 +258,15 @@ begin
     modules.enable(name)
   when 'list'
     mods = modules.list
-    table = []
-    mods.keys.sort.each do |name|
-      table << [name,mods[name][:state]]
+    if options.json
+      $stdout.puts JSON.pretty_generate(mods)
+    else
+      table = []
+      mods.keys.sort.each do |name|
+        table << [name,mods[name][:state]]
+      end
+      $stdout.puts CLI::Table.print(table)
     end
-    $stdout.puts CLI::Table.print(table)
   else
     raise("Command [#{command}] is not supported!")
   end
