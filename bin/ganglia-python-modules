@@ -1,0 +1,275 @@
+#!/usr/bin/env ruby
+#
+# Copyright 2014 Victor Penso
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+require 'ostruct'
+require 'getoptlong' 
+require 'logger'
+
+module CLI
+  class Table
+    def initialize(output)
+      @output = output
+    end
+    def self.print(table)
+      Table.new(table).rows
+    end
+    def rows
+      form = format()
+      rows = String.new
+      @output.each do |row|
+        $logger.debug("#{row.inspect}")
+        rows << sprintf("#{form}\n", *row)
+      end
+      return rows
+    end
+    def format
+      format = Array.new
+      columns = @output.first.length
+      0.upto(columns-1) do |column|
+        format << "%-#{field_width(column)}s"
+      end
+      return format.join(' ')
+    end
+    def field_width(field = 0)
+      max_width = 0
+      @output.each do |row|
+        elem = row[field].to_s
+        next if elem.empty?
+        width = elem.length
+        max_width = width if width > max_width
+      end
+      return max_width
+    end
+  end
+end
+
+module Ganglia
+
+  class Modules
+
+    def initialize(config_path,module_path)
+      if File.directory?(config_path)
+        @config_path = config_path
+      else
+        raise("Path to configuration files [#{config_path}] not existing!")
+      end
+      if File.directory?(module_path)
+        @module_path = module_path
+      else
+        raise("Path to module files [#{module_path}] not existing!")
+      end
+    end
+
+    def list
+      config_files = config
+      list = Hash.new
+      [:enabled,:disabled].each do |state|
+        config_files[state].each do |file|
+          name = file.split('/')[-1].gsub(/\.pyconf.*$/,'')
+          list[name] = {:config => file,:state => state}
+        end
+      end 
+      files.each do |file|
+        name = file.split('/')[-1].gsub(/\.py$/,'')
+        if list.has_key?(name)
+          list[name][:module] = file
+        else
+          $logger.warn("No configuration file for module [#{name}] found!")
+        end
+      end
+      return list
+    end
+
+    def disable(name)
+      mods = list
+      if mods.has_key?(name)
+        if mods[name][:state] == :enabled
+          dest = "#{mods[name][:config]}.disabled"
+          File.rename(mods[name][:config],dest)
+        else
+          $stdout.puts "Module [#{name}] is disabled already!"
+        end
+      else
+        raise("Module [#{name}] not available!")
+      end
+    end
+
+    def enable(name)
+      mods = list
+      if mods.has_key?(name)
+        if mods[name][:state] == :disabled
+          dest = mods[name][:config].gsub(/\.disabled$/,'') 
+          File.rename(mods[name][:config],dest)
+        else
+          $stdout.puts "Module [#{name}] is enabled already!"
+        end
+      else
+        raise("Module [#{name}] not available!")
+      end
+    end
+
+    private
+
+    def config
+      pattern = "#{@config_path}/*.py*"
+      config = { :enabled => Array.new, :disabled => Array.new }
+      $logger.info "Search for Python module configuration files [#{pattern}]"
+      Dir.glob(pattern).each do |file|
+        case file
+        when /^*\.pyconf$/
+          config[:enabled] << file
+        else
+          config[:disabled] << file
+        end
+      end
+      return config
+    end
+
+    def files
+      pattern = "#{@modules_path}/*.py"
+      modules = Array.new
+      $logger.info "Search for Python modules [#{pattern}]"
+      return Dir.glob(pattern)
+    end
+
+  end
+
+end
+
+
+exec_name = File.split(__FILE__)[-1]
+HELP = <<EOF
+Manage Ganglia Python modules for Gmond.
+
+#{exec_name} [-dhv] COMMAND [MODULE] 
+
+Commands
+--------
+
+  enable MODULE
+    Enable module called MODULE.
+  disable MODULE
+    Disable module called MODULE.
+  list
+    List available Python modules, and their state.
+
+Options
+-------
+
+  --config-path PATH
+    Path to module confgiruation files (default
+    /etc/ganglia/conf.d).
+  --debug, -d
+    Show stacktraces in case of errors.
+  --help, -h
+    Show this help information.
+  --log-level, -L debug|info|warn|fatal
+    Verbosity of the program output.
+  --module-path, -m PATH
+  --version, -v
+    Print version number.
+EOF
+
+
+begin
+
+  #stdin = $stdin.tty? ? String.new : $stdin.read
+
+  options = OpenStruct.new
+  options.debug = false
+  options.config_path = '/etc/ganglia/conf.d'
+  options.module_path = '/usr/lib/ganglia/python_modules'
+
+  $logger = Logger.new($stderr)
+  # Adjust the time format used for the logger
+  $logger.datetime_format = "%Y-%m-%dT%H:%M:%S"
+  $logger.formatter = proc do |severity, datetime, progname, message|
+    "[#{datetime.strftime($logger.datetime_format)}] #{severity} -- #{message}\n"
+  end
+  $logger.level = Logger::FATAL
+
+  GetoptLong.new(
+    ['--config-path','-c',GetoptLong::REQUIRED_ARGUMENT],
+    ['--debug','-d',GetoptLong::NO_ARGUMENT],
+    ['--help','-h',GetoptLong::NO_ARGUMENT],
+    ['--log-level','-L',GetoptLong::REQUIRED_ARGUMENT],
+    ['--module-path','-m',GetoptLong::REQUIRED_ARGUMENT],
+    ['--version','-v',GetoptLong::NO_ARGUMENT]
+  ).each do |opt,arg|
+    case opt
+    when '--config-path'
+      options.config_path = arg
+    when '--debug'
+      options.debug = true
+      $logger.level = Logger::DEBUG
+    when '--help'
+      $stdout.puts HELP
+      exit 0
+    when '--log-level'
+      $logger.level = case arg
+      when 'warn'
+        Logger::WARN
+      when 'debug'
+        Logger::DEBUG
+      when 'fatal'
+        Logger::FATAL
+      else
+        Logger::INFO
+       end
+    when '--module-path'
+      options.config_path = arg
+    when '--version'
+      $stdout.puts 0.1
+      exit 0
+    end
+  end
+
+  modules = Ganglia::Modules.new(options.config_path,options.module_path) 
+
+  command = ARGV.shift || raise('No command given!')
+  case command
+  when 'disable'
+    name = ARGV.shift || raise('No module name defined!')
+    modules.disable(name)
+  when 'enable'
+    name = ARGV.shift || raise('No module name defined!')
+    modules.enable(name)
+  when 'list'
+    mods = modules.list
+    table = []
+    mods.keys.sort.each do |name|
+      table << [name,mods[name][:state]]
+    end
+    $stdout.puts CLI::Table.print(table)
+  else
+    raise("Command [#{command}] is not supported!")
+  end
+
+rescue => exc
+  $stderr.puts "ERROR: #{exc.message}"
+  $stderr.puts "Use -h for detailed instructions"
+  if options.debug
+    $stderr.puts '-- Stack Trace --'
+    $stderr.puts exc.backtrace
+  else
+    $stderr.puts 'You may want run this in debug mode with \'-d\''
+  end
+  exit 1
+end
+
+exit 0
