@@ -132,7 +132,7 @@ module Ganglia
       $logger.info "Search for Python module configuration files [#{pattern}]"
       Dir.glob(pattern).each do |file|
         case file
-        when /^*\.pyconf$/
+        when /^.*\.pyconf$/
           config[:enabled] << file
         else
           config[:disabled] << file
