@@ -49,7 +49,12 @@ def update_metrics(time_max = 20):
             # Reset the perfquery counters (with exception of errors)
             trash = subprocess.Popen(command, stdout=subprocess.PIPE).stdout.readlines()
             # accumulate counters for one second
+            begin = time.time()
             time.sleep(1)
+            end = time.time()
+            # Sleep in Python is not real-time, means that depending on system interrupts
+            # the relapsed time-frame is bigger then a second
+            elapsed = end - begin
             # read the metrics for the past second
             perf_data = subprocess.Popen(command, stdout=subprocess.PIPE).stdout.readlines()
             for line in perf_data:
@@ -58,9 +63,9 @@ def update_metrics(time_max = 20):
                value = line[1]
                value = value.replace('.','').strip()
                if key == "RcvPkts":
-                  perfquery[port]["rcvpkts"] = value
+                  perfquery[port]["rcvpkts"] = int(float(value)/elapsed)
                elif key == "XmtPkts":
-                  perfquery[port]["xmtpkts"] = value
+                  perfquery[port]["xmtpkts"] = int(float(value)/elapsed)
                # Data port counters indicate octets divided by 4 rather than just octets.
                #
                # It's consistent with what the IB spec says (IBA 1.2 vol 1 p.948) as to
@@ -72,9 +77,9 @@ def update_metrics(time_max = 20):
                # For simplification the values are multiplied by for to represent 
                # octets/bytes, for better visualization on in graphs "bytes/second"
                elif key == "RcvData":
-                  perfquery[port]["rcvdata"] = int(value) * 4
+                  perfquery[port]["rcvdata"] = int((float(value)*4)/elapsed)
                elif key == "XmtData":
-                  perfquery[port]["xmtdata"] = int(value) * 4
+                  perfquery[port]["xmtdata"] = int((float(value)*4)/elapsed)
                elif key == "SymbolErrors":
                   perfquery[port]["symbolerrors"] = value
                elif key == "LinkRecovers":
