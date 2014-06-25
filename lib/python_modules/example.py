@@ -17,22 +17,32 @@
 #
 
 import time
+import logging
 
 # Data structure used to hold all monitoring metrics 
 # collected by this sensor
 metrics = {}
 
 def update_metrics():
+    
     global metrics
+    
+    logging.debug("Update metrics...")
+    
     # Set values for individual metrics
     metrics["example"] = 123
 
 # It takes one parameter, 'name', which is the value defined 
 # in the 'name' element in your metric descriptor. 
 def metric_handler(name):
+
     global metrics
+
+    logging.debug("Call for metric: %s", name)
+
     # Make sure to update metrics for this execution interval
     update_metrics()
+
     # Return the value for a particular metric
     return metrics[name]
             
@@ -48,7 +58,9 @@ def metric_handler(name):
 # configuration directives that were designated for this 
 # module in the gmond.conf file.
 def metric_init(params):
-
+    
+    global logger
+    
     # Metric description dictionary, will be returned to the 
     # module caller Gmond. 
     descriptors = list()
@@ -65,6 +77,7 @@ def metric_init(params):
         "groups":     "Example",
     };
     # Add this metric to the descriptor list
+    logging.debug("Register metric: %s", metric["name"])
     descriptors.append(metric)
 
     # Register metrics provided by this module
@@ -79,6 +92,8 @@ def metric_cleanup():
     pass
 
 if __name__ == '__main__':
+
+    logging.root.setLevel(logging.DEBUG) 
 
     params = { "maximum_life_time": "20" }
 
