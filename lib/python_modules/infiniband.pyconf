@@ -2,11 +2,8 @@ modules {
   module {
     name = "infiniband"
     language = "python"
-    param "interval" {
+    param "maximum_life_time" {
        value = "20"
-    }
-    param "error_metrics" {
-       value = "yes"
     }
   }
 }
@@ -15,20 +12,36 @@ collection_group {
   collect_every = 15
   time_threshold = 45
   metric { 
-    name_match = "infiniband_xmtdata_port" 
-    title = "Infiniband Send Bytes"
+    name_match = "infiniband_portxmitbytessec_port" 
+    title = "Infiniband PortXmitBytesSec"
   }
   metric { 
-    name_match = "infiniband_rcvdata_port" 
-    title = "Infiniband Received Bytes"
+    name_match = "infiniband_portrcvbytessec_port" 
+    title = "Infiniband PortRcvBytesSec"
   }    
   metric { 
-    name_match = "infiniband_xmtpkts_port" 
-    title = "Infiniband Send Packages"
+    name_match = "infiniband_portxmitpktssec_port" 
+    title = "Infiniband PortXmitPktsSec"
   }
   metric { 
-    name_match = "infiniband_rcvpkts_port" 
-    title = "Infiniband Received Packages"
+    name_match = "infiniband_portrcvpktssec_port" 
+    title = "Infiniband PortRcvPktsSec"
+  }
+  metric { 
+    name_match = "infiniband_portunicastxmitpktssec_port" 
+    title = "Infiniband PortUnicastXmitPktsSec"
+  }
+  metric { 
+    name_match = "infiniband_portunicastrcvpktssec_port" 
+    title = "Infiniband PortUnicastRcvPktsSec"
+  }
+  metric { 
+    name_match = "infiniband_portmulticastxmitpktssec_port" 
+    title = "Infiniband PortMulticastXmitPktsSec"
+  }
+  metric { 
+    name_match = "infiniband_portmulticastrcvpktssec_port" 
+    title = "Infiniband PortMulticastRcvPktsSec"
   }
   metric { 
     name_match = "infiniband_linkdowned_port" 
