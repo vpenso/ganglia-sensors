@@ -1,5 +1,10 @@
+## Description
 
-# Gmetric
+This repository contains code used to collect monitoring metrics for [Ganglia](https://github.com/ganglia):
+
+> Ganglia is a scalable distributed monitoring system for high-performance computing systems such as clusters and Grids. […] It uses carefully engineered data structures and algorithms to achieve very low per-node overheads and high concurrency. [cf.](http://ganglia.info/)
+
+## Gmetric
 
 All metrics in Ganglia have a **name**, **value**, **type** and optionally **units**:
 
@@ -19,7 +24,7 @@ String values send to Ganglia are not persistent, and will be lost once gmetad/g
 » gmetric --type string --name "Service" --value "Ganglia Monitoring Server"
 ~~~
 
-## Scripts
+### Scripts
 
 The following script **gmetric-mpstat** is a more elaborate example. It collects per core statistics using `mpstat`, and sends these to Ganglia. It uses the `--group` option to define a metric collection "cpu_cores".
 
@@ -46,7 +51,7 @@ The option `--name` defines the graph title and file name on the Ganglia server:
     /var/lib/ganglia/rrds/[…]/cpu_core_0_sys.rrd
     /var/lib/ganglia/rrds/[…]/cpu_core_0_usr.rrd
 
-## Execution
+### Execution
 
 It is common to use **cron** to execute a script within an interval to send monitoring information with `gmetric`. Alternatively it is possible to daemonice the collection script itself.
 
@@ -55,7 +60,7 @@ Program | Description
 [gmetric-infiniband](bin/gmetric-infiniband) | Small daemon sending Infiniband metrics collected from `perfquery` to Ganglia 
 
 
-# Modules
+## Modules
 
 Ganglia can be extended by Python and C/C++ modules. Modules are executed (in intervals) by gmond in contrast to data collected with gmetric. The Debian package **ganglia-monitor-python** provides the required environment to enable Python modules.
 
@@ -64,7 +69,7 @@ Module | Configuration  | Description
 [infiniband.py](lib/python_modules/infiniband.py) | [infiniband.pyconf](etc/conf.d/infiniband.pyconf) | Read Infiniband host channel performance metrics from `perfquery`
 [ipmi.py](lib/python_modules/infiniband.py) | [ipmi.pyconf](etc/conf.d/ipmi.pyconf) | Read the BMC sensors with `ipmitool`
 
-## Configuration
+### Configuration
 
 Path | Description
 -----|----------------------
@@ -106,7 +111,7 @@ collection_group {
 }
 ~~~
 
-## Development
+### Development
 
 Start developing new Python modules from ↴<tt>[lib/python_modules/example.py](lib/python_modules/example.py)</tt>
 
@@ -123,3 +128,14 @@ Check if the metric description is correctly used by gmond:
     […]
 
 Run gmond in foreground and debugging mode the see if everything works as expected.
+
+## License
+
+Copyright 2014-2015 Victor Penso
+
+This is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
+
