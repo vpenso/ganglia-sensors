@@ -1,0 +1,290 @@
+#!/usr/bin/env ruby
+#
+# Copyright 2015 Victor Penso
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+require 'rubygems'
+require 'ostruct'
+require 'logger'
+require 'getoptlong' 
+require 'socket'
+require 'json'
+
+class Hash
+  def self.autonew(*args)
+    new(*args){|hsh, key| hsh[key] = Hash.new(&hsh.default_proc) }
+  end
+end
+
+module System
+
+  def self.command?(command)
+    `which #{command}`
+    return true if $?.success?
+    return false
+  end
+
+  def self.exec(command)
+    command = command.gsub(/\n/," ").strip.gsub(/\s+/,' ')
+    command + ' 2>&1'
+    $logger.debug "Exec [#{command}]"
+    # Execute command as subprocess and return the exit code
+    pipe = IO.popen(command)
+    # Get the process ID from the child
+    pid = pipe.pid
+    # Read the output from the stream
+    output = pipe.read
+    # Wait for successful return and pass back the code to the caller
+    Process.wait(pid)
+    state=$?
+    $logger.debug "Returned with #{state}"
+    if state == 0
+      return output.gsub(/^$\n/, '')
+    else
+      $logger.warn "Failed to execute [#{command}]"
+      return nil
+    end
+  end
+
+end
+
+module Slurm
+
+  module Jobs
+
+    def self.states
+      raise('Command [squeue] not in path!') unless System.command? 'squeue' 
+
+      # Get a list of jobs and their state from Slurm
+      command = %q{squeue -h -o '%A,%T'}
+      output = System.exec(command)
+
+      # Iterate over the job list to count the states
+      values = {
+        pending: 0, 
+        running: 0,
+        suspended: 0, 
+        cancelled: 0, 
+        completing: 0, 
+        completed: 0, 
+        configuring: 0, 
+        failed: 0, 
+        timeout: 0, 
+        preempted: 0, 
+        node_fail: 0,
+        special_exit: 0
+      }
+      unless output.nil?
+        output.split("\n").each do |line|
+          job_id, state =  line.split(',')
+          values[state.downcase.to_sym] += 1
+        end
+      end
+      return values
+    end 
+
+  end
+
+end
+
+class Ganglia
+
+  def initialize 
+    raise("Command [gmetric] not in path!") unless System.command? 'gmetric'
+  end
+
+  def gmetric
+    job_states
+  end
+
+  private
+
+  def job_states
+    Slurm::Jobs::states.each_pair do |state,count|
+      command = %Q[gmetric --group=slurm --type=uint32 --name=jobs_#{state} --value=#{count}]
+    end
+  end
+
+end
+
+
+
+
+exec_name = File.split(__FILE__)[-1]
+HELP = <<EOF
+Send Slurm metrics to Gagnlia. 
+
+  #{exec_name} [-dDhiv] [-l path] [-L level] [-p path]
+
+Usage
+-----
+
+Options
+-------
+
+  --debug, -d
+    Show stacktraces in case of errors.
+  --daemonize, -D 
+    Background daemon process.
+  --interval, -i SECONDS
+    Time interval to send data to Ganglia (default = 20).
+  --help, -h
+    Show this help information.
+  --log-file, -l PATH:
+    Path to the log file when executed as daemon (defaults
+    to /var/log/#{exec_name}.log).
+  --log-level, -L debug|info|warn|fatal
+    Verbosity of the logging output.
+  --once, -o
+    Send the metrics once to Ganglia.
+  --pid-file, -p PATH:
+    Path to a file storing the process ID when executed as 
+    daemon (default to /var/run/#{exec_name}.pid)
+  --version, v
+    Print program version.
+EOF
+
+begin
+
+  # Unlikely to be used by a daemon 
+  #stdin = $stdin.tty? ? String.new : $stdin.read
+
+  $DEBUG = false
+
+  $options = OpenStruct.new
+  $options.debug = false
+  $options.interval = 300
+  $options.daemonize = false
+  $options.pid_file = "/var/run/#{exec_name}.pid"
+  $options.log_file = "/var/log/#{exec_name}.log"
+  
+  $options.error_counters = false
+  $options.interval = 20
+  $options.once = false
+
+  $logger = Logger.new(STDOUT)
+  # Adjust the time format used for the logger
+  $logger.datetime_format = "%Y-%m-%dT%H:%M:%S"
+  $logger.formatter = proc do |severity, datetime, progname, message|
+    "[#{datetime.strftime($logger.datetime_format)}] #{severity} -- #{message}\n"
+  end
+
+  $logger.level = Logger::INFO
+
+  GetoptLong.new(
+    ['--daemonize','-D',GetoptLong::NO_ARGUMENT],
+    ['--once','-o',GetoptLong::NO_ARGUMENT],
+    ['--interval','-i',GetoptLong::REQUIRED_ARGUMENT],
+    ['--pid-file','-p',GetoptLong::REQUIRED_ARGUMENT],
+    ['--log-file','-l',GetoptLong::REQUIRED_ARGUMENT],
+    ['--log-level','-L',GetoptLong::REQUIRED_ARGUMENT],
+    ['--version','-v',GetoptLong::NO_ARGUMENT],
+    ['--debug','-d',GetoptLong::NO_ARGUMENT],
+    ['--help','-h',GetoptLong::NO_ARGUMENT]
+  ).each do |opt,arg|
+    case opt
+    when '--interval'
+      $options.interval = arg
+    when '--once'
+      $options.once = true
+    when '--pid-file'
+      $options.pid_file = arg
+    when '--log-file'
+      $options.log_file = arg
+    when '--log-level'
+      $logger.level = case arg
+         when 'warn'
+           Logger::WARN
+         when 'debug'
+           Logger::DEBUG
+         when 'fatal'
+           Logger::FATAL
+         else
+           Logger::INFO
+         end
+      $options.debug = true if arg == 'debug'
+    when '--version'
+      $stdout.puts 0.1
+      exit 0
+    when '--debug'
+      $options.debug = true
+      $logger.level = Logger::DEBUG
+    when '--help'
+      $stdout.puts HELP
+      exit 0
+    end
+  end
+
+  shutdown = false
+
+  Signal.trap('TERM') do
+    $logger.info "Service terminated."
+    exit 0
+  end
+  Signal.trap('INT') do
+    $logger.info "Wait for shutdown..."
+    shutdown = true
+  end
+ 
+  if $options.daemonize
+    if RUBY_VERSION < '1.9'
+      exit if fork
+      Process.setsid
+      exit if fork
+      Dir.chdir '/'
+    else
+      Process.daemon
+    end
+    # Write the process ID to a file
+    File.open($options.pid_file,'w') { |file| file.write "#{$$}\n"}
+    # Bind output to a log file
+    $stdin.reopen '/dev/null'
+    $stdout.reopen($options.log_file,'w')
+    $stdout.sync = true
+    $stderr.reopen($stdout)
+  end
+
+  ganglia = Ganglia.new
+
+  if $options.once
+    ganglia.gmetric
+  # Dive into an endless loop
+  else
+    while(true)
+      break if shutdown
+      # Send Infiniband network metrics to Ganglia
+      ganglia.gmetric
+      # Wait for time period to elapse 
+      sleep $options.interval - 1
+    end
+    $logger.info "Service stopped!"
+  end
+
+rescue => exc
+  $stderr.puts "ERROR: #{exc.message}"
+  $stderr.puts " use -h for detailed instructions"
+  if $options.debug
+    $stderr.puts "Catched: #{exc.class}"
+    $stderr.puts '-- Stack Trace --'
+    $stderr.puts exc.backtrace
+  else
+    $stderr.puts 'You may want run this in debug mode with \'-d\''
+  end
+  exit 1
+end
+
+exit 0
