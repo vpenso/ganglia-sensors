@@ -46,33 +46,23 @@ The option `--name` defines the graph title and file name on the Ganglia server:
     /var/lib/ganglia/rrds/[…]/cpu_core_0_sys.rrd
     /var/lib/ganglia/rrds/[…]/cpu_core_0_usr.rrd
 
-## Crontab
+## Execution
 
-Execute gmetric scripts with Cron by adding files to `/etc/cron.d`.
+It is common to use **cron** to execute a script within an interval to send monitoring information with `gmetric`. Alternatively it is possible to daemonice the collection script itself.
 
-Here illustrated with a script called **gmetric-perfquery**:
+Program | Description
+--------|---------------------
+[gmetric-infiniband](bin/gmetric-infiniband) | Small daemon sending Infiniband metrics collected from `perfquery` to Ganglia 
 
-~~~
-» cat /etc/cron.d/gmetric-perfquery 
-PATH=/usr/sbin:/usr/sbin:/usr/bin:/sbin:/bin
-# Send Infiniband perfquery metrics to Ganglia every 60 seconds
-* * * * * root gmetric-perfquery -L info -e -o -i 60
-~~~
-
-Make sure all dependency scripts are in path. Check if the script is executed by cron:
-
-    » tail -f /var/log/syslog | grep CRON
-    […]
-    […] (*system*gmetric-perfquery) RELOAD (/etc/cron.d/gmetric-perfquery)
-    […] (root) CMD (gmetric-perfquery -L info -e -o -i 60)
-    […]
 
 # Modules
 
-Ganglia can be extended by Python and C/C++ modules. Modules are executed (in intervals) by gmond in contrast to data collected with gmetric.
+Ganglia can be extended by Python and C/C++ modules. Modules are executed (in intervals) by gmond in contrast to data collected with gmetric. The Debian package **ganglia-monitor-python** provides the required environment to enable Python modules.
 
-The Debian package **ganglia-monitor-python** provides the required environment to enable Python modules.
-
+Module | Configuration  | Description
+-------|----------------|--------------
+[infiniband.py](lib/python_modules/infiniband.py) | [infiniband.pyconf](etc/conf.d/infiniband.pyconf) | Read Infiniband host channel performance metrics from `perfquery`
+[ipmi.py](lib/python_modules/infiniband.py) | [ipmi.pyconf](etc/conf.d/ipmi.pyconf) | Read the BMC sensors with `ipmitool`
 
 ## Configuration
 
@@ -81,7 +71,7 @@ Path | Description
 `/usr/lib/ganglia/python_modules` | Default directory for Python modules
 `/etc/ganglia/conf.d/*.pyconf` | Module configuration files
 
-Their **module** section of the configuration file requires following attributes:
+The **module** section of the configuration file requires following attributes:
 
 - The **name** value matches the file name of the Python module’s `.py` file.
 - The **language** value for a Python module must be "python".
@@ -89,10 +79,10 @@ Their **module** section of the configuration file requires following attributes
 
 The **collection_group** section must contain:
 
-- **name_match** uses PCRE regex matching to configure metrics using.
-- **title** is displayed in the web-interface as name of the graph.
+- The **name_match** uses PCRE regex matching to configure metrics.
+- The **title** is displayed in the web-interface as name of the graph.
 
-Following examples illustrates the configuration of a module called infiniband:
+Following examples illustrates the configuration of a module called "infiniband":
 
 ~~~
 modules {
