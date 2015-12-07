@@ -154,8 +154,6 @@ Options
     to /var/log/#{exec_name}.log).
   --log-level, -L debug|info|warn|fatal
     Verbosity of the logging output.
-  --once, -o
-    Send the metrics once to Ganglia.
   --pid-file, -p PATH:
     Path to a file storing the process ID when executed as 
     daemon (default to /var/run/#{exec_name}.pid)
@@ -175,12 +173,11 @@ begin
   $options.dry_run = false
   $options.interval = 300
   $options.daemonize = false
-  $options.pid_file = "/var/run/#{exec_name}.pid"
-  $options.log_file = "/var/log/#{exec_name}.log"
+  $options.pid_file = String.new
+  $options.log_file = String.new
   
   $options.error_counters = false
   $options.interval = 20
-  $options.once = false
 
   $logger = Logger.new(STDOUT)
   # Adjust the time format used for the logger
@@ -193,15 +190,14 @@ begin
 
   GetoptLong.new(
     ['--daemonize','-D',GetoptLong::NO_ARGUMENT],
+    ['--debug','-d',GetoptLong::NO_ARGUMENT],
     ['--dry-run',GetoptLong::NO_ARGUMENT],
-    ['--once','-o',GetoptLong::NO_ARGUMENT],
+    ['--help','-h',GetoptLong::NO_ARGUMENT],
     ['--interval','-i',GetoptLong::REQUIRED_ARGUMENT],
-    ['--pid-file','-p',GetoptLong::REQUIRED_ARGUMENT],
     ['--log-file','-l',GetoptLong::REQUIRED_ARGUMENT],
     ['--log-level','-L',GetoptLong::REQUIRED_ARGUMENT],
-    ['--version','-v',GetoptLong::NO_ARGUMENT],
-    ['--debug','-d',GetoptLong::NO_ARGUMENT],
-    ['--help','-h',GetoptLong::NO_ARGUMENT]
+    ['--pid-file','-p',GetoptLong::REQUIRED_ARGUMENT],
+    ['--version','-v',GetoptLong::NO_ARGUMENT]
   ).each do |opt,arg|
     case opt
     when '--daemonize'
@@ -215,8 +211,6 @@ begin
       $logger.level = Logger::DEBUG
     when '--interval'
       $options.interval = arg
-    when '--once'
-      $options.once = true
     when '--pid-file'
       $options.pid_file = arg
     when '--log-file'
@@ -262,30 +256,33 @@ begin
     else
       Process.daemon
     end
+  end
+
+  unless $options.pid_file.empty?
     # Write the process ID to a file
     File.open($options.pid_file,'w') { |file| file.write "#{$$}\n"}
+    $logger.info "Process ID stored to #{$options.pid_file}"
+  end
+
+  unless $options.log_file.empty?
     # Bind output to a log file
     $stdin.reopen '/dev/null'
     $stdout.reopen($options.log_file,'w')
     $stdout.sync = true
     $stderr.reopen($stdout)
+    $logger.info "Writing log into #{$options.log_file}"
   end
 
   ganglia = Ganglia.new
 
-  if $options.once
+  while(true)
+    break if shutdown
+    # Send Infiniband network metrics to Ganglia
     ganglia.gmetric
-  # Dive into an endless loop
-  else
-    while(true)
-      break if shutdown
-      # Send Infiniband network metrics to Ganglia
-      ganglia.gmetric
-      # Wait for time period to elapse 
-      sleep $options.interval - 1
-    end
-    $logger.info "Service stopped!"
+    # Wait for time period to elapse 
+    sleep $options.interval - 1
   end
+  $logger.info "Service stopped!"
 
 rescue => exc
   $stderr.puts "ERROR: #{exc.message}"
