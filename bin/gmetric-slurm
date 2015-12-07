@@ -68,34 +68,63 @@ module Slurm
 
     def self.states
       raise('Command [squeue] not in path!') unless System.command? 'squeue' 
-
-      # Get a list of jobs and their state from Slurm
       command = %q{squeue -h -o '%A,%T'}
       output = System.exec(command)
-
-      # Iterate over the job list to count the states
-      values = {
-        pending: 0, 
-        running: 0,
-        suspended: 0, 
-        cancelled: 0, 
-        completing: 0, 
-        completed: 0, 
-        configuring: 0, 
-        failed: 0, 
-        timeout: 0, 
-        preempted: 0, 
-        node_fail: 0,
-        special_exit: 0
-      }
       unless output.nil?
+        states = {
+          pending: 0, 
+          running: 0,
+          suspended: 0, 
+          cancelled: 0, 
+          completing: 0, 
+          completed: 0, 
+          configuring: 0, 
+          failed: 0, 
+          timeout: 0, 
+          preempted: 0, 
+          node_fail: 0,
+          special_exit: 0
+        }
         output.split("\n").each do |line|
           job_id, state =  line.split(',')
-          values[state.downcase.to_sym] += 1
+          states[state.downcase.to_sym] += 1
         end
+        return states
       end
-      return values
+      return nil
     end 
+
+  end
+
+  module Nodes
+
+    def self.states
+      raise('Command [sinfo] not in path!') unless System.command? 'sinfo' 
+      command = %q{sinfo -h -o '%n,%T'}
+      output = System.exec(command)
+      unless output.nil?
+        states = { alloc: 0, comp: 0, down: 0, drain: 0, idle: 0 }
+        output.split("\n").each do |line|
+          node, state =  line.split(',')
+          case state
+          when /^alloc/,/^mix/
+            states[:alloc] += 1
+          when /^comp/
+            states[:comp] += 1
+          when /^down/
+            states[:down] += 1
+          when /^drain/
+            states[:drain] += 1
+          when /^idle/
+            states[:idle] += 1
+          else
+            $logger.debug %Q[Node state "#{state}" is not supported]
+          end
+        end
+        return states
+      end
+      return nil
+    end
 
   end
 
@@ -109,17 +138,35 @@ class Ganglia
 
   def gmetric
     job_states
+    node_states
   end
 
   private
 
+  # Wrap System::exec to support a dry-run option for all gmetric commands
+  def exec(command)
+    command = %Q[gmetric --group=slurm #{command}]
+    if $options.dry_run
+      $logger.debug "Exec [#{command}]"
+    else
+      System::exec(command)
+    end
+  end
+
   def job_states
-    Slurm::Jobs::states.each_pair do |state,count|
-      command = %Q[gmetric --group=slurm --type=uint32 --name=jobs_#{state} --value=#{count}]
-      if $options.dry_run
-        $logger.debug "Exec [#{command}]"
-      else
-        System::exec(command)
+    states = Slurm::Jobs::states
+    unless states.nil?
+      states.each_pair do |state,count|
+        exec %Q[--type=uint32 --name=jobs_#{state} --value=#{count}]
+      end
+    end
+  end
+
+  def node_states
+    states = Slurm::Nodes::states
+    unless states.nil?
+      states.each_pair do |state,count|
+        exec %Q[--type=uint32 --name=nodes_#{state} --value=#{count}]
       end
     end
   end
@@ -210,7 +257,7 @@ begin
       $options.debug = true
       $logger.level = Logger::DEBUG
     when '--interval'
-      $options.interval = arg
+      $options.interval = arg.to_i
     when '--pid-file'
       $options.pid_file = arg
     when '--log-file'
@@ -277,9 +324,7 @@ begin
 
   while(true)
     break if shutdown
-    # Send Infiniband network metrics to Ganglia
     ganglia.gmetric
-    # Wait for time period to elapse 
     sleep $options.interval - 1
   end
   $logger.info "Service stopped!"
