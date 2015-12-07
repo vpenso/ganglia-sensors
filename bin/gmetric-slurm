@@ -131,12 +131,10 @@ end
 
 exec_name = File.split(__FILE__)[-1]
 HELP = <<EOF
-Send Slurm metrics to Gagnlia. 
+Send Slurm metrics to Ganglia
 
-  #{exec_name} [-dDhiv] [-l path] [-L level] [-p path]
-
-Usage
------
+  #{exec_name} [-l path] [-L level] [-p path] [-i interval]
+               [--daemonize] [--dry-run]
 
 Options
 -------
@@ -196,7 +194,7 @@ begin
   GetoptLong.new(
     ['--daemonize','-D',GetoptLong::NO_ARGUMENT],
     ['--dry-run',GetoptLong::NO_ARGUMENT],
-    ['--once','-o',Getoptlong::NO_ARGUMENT],
+    ['--once','-o',GetoptLong::NO_ARGUMENT],
     ['--interval','-i',GetoptLong::REQUIRED_ARGUMENT],
     ['--pid-file','-p',GetoptLong::REQUIRED_ARGUMENT],
     ['--log-file','-l',GetoptLong::REQUIRED_ARGUMENT],
@@ -247,10 +245,12 @@ begin
   shutdown = false
 
   Signal.trap('TERM') do
+    Thread.new { $logger.info "Service terminated!" }
     exit 0
   end
   Signal.trap('INT') do
     shutdown = true
+    Thread.new { $logger.info "Stopping service in #{$options.interval} seconds..." }
   end
  
   if $options.daemonize
