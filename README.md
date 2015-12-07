@@ -61,7 +61,7 @@ Program | Description
 [gmetric-slurm](bin/gmetric-slurm) | Collect jobs, node and scheduler statistics from [Slurm](https://github.com/SchedMD/slurm) 
 
 
-## Modules
+## Gmond Modules
 
 Ganglia can be extended by Python and C/C++ modules. Modules are executed (in intervals) by gmond in contrast to data collected with gmetric. The Debian package **ganglia-monitor-python** provides the required environment to enable Python modules.
 
@@ -129,6 +129,44 @@ Check if the metric description is correctly used by gmond:
     […]
 
 Run gmond in foreground and debugging mode the see if everything works as expected.
+
+## Graphs
+
+Extension code for the Ganglia [Web Frontend](https://github.com/ganglia/ganglia-web)
+
+File | Description
+-----|--------------------
+[infiniband_report.json](etc/graph.d/infiniband_report.json) | Incoming and outgoing traffic on an Infiniband adapter in bytes per second
+
+### Configuration
+
+The file name must end with `_report.json`. Graph configuration attributes are:
+
+Attribute       | Description
+----------------|-----------------------------
+report_name     | Name of the report that web UI uses
+title           | Title of the report to show on a graph
+vertical_label  | Y-axis description (optional)
+series          | An array of metrics to use to compose a graph
+
+The attributes inside the **series key** contain:
+
+Attribute       | Description
+----------------|-----------------------------
+metric          | Name of a metric, such as load_one and cpu_system. If the metric doesn’t exist it will be skipped.
+color           | A 6 hex-decimal color code, such as 000000 for black.
+label           | Metric label, such as Load 1.
+type            | Item type. It can be either line or stack.
+line_width      | If type is set to line, this value will be used as a line width. If this value is not specified, it defaults to 2. If type is stack, it’s ignored even if set. 
+
+### Deployment 
+
+Deploy custom composite graphs:
+
+1. Copy the JSON configuration file into the directory `/usr/share/ganglia-webfrontend/graph.d` on the server hosting the web frontend.
+2. Enable a graph using the "Edit Optional Graphs" button in the user interface of the web frontend.
+
+
 
 ## License
 
