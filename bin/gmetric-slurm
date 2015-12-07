@@ -116,7 +116,11 @@ class Ganglia
   def job_states
     Slurm::Jobs::states.each_pair do |state,count|
       command = %Q[gmetric --group=slurm --type=uint32 --name=jobs_#{state} --value=#{count}]
-      System::exec(command)
+      if $options.dry_run
+        $logger.debug "Exec [#{command}]"
+      else
+        System::exec(command)
+      end
     end
   end
 
@@ -137,10 +141,12 @@ Usage
 Options
 -------
 
-  --debug, -d
-    Show stacktraces in case of errors.
   --daemonize, -D 
     Background daemon process.
+  --debug, -d
+    Show stacktraces in case of errors.
+  --dry-run
+    Enable debug mode, and do not send metrics to Ganglia. 
   --interval, -i SECONDS
     Time interval to send data to Ganglia (default = 20).
   --help, -h
@@ -168,6 +174,7 @@ begin
 
   $options = OpenStruct.new
   $options.debug = false
+  $options.dry_run = false
   $options.interval = 300
   $options.daemonize = false
   $options.pid_file = "/var/run/#{exec_name}.pid"
@@ -188,7 +195,8 @@ begin
 
   GetoptLong.new(
     ['--daemonize','-D',GetoptLong::NO_ARGUMENT],
-    ['--once','-o',GetoptLong::NO_ARGUMENT],
+    ['--dry-run',GetoptLong::NO_ARGUMENT],
+    ['--once','-o',Getoptlong::NO_ARGUMENT],
     ['--interval','-i',GetoptLong::REQUIRED_ARGUMENT],
     ['--pid-file','-p',GetoptLong::REQUIRED_ARGUMENT],
     ['--log-file','-l',GetoptLong::REQUIRED_ARGUMENT],
@@ -198,6 +206,15 @@ begin
     ['--help','-h',GetoptLong::NO_ARGUMENT]
   ).each do |opt,arg|
     case opt
+    when '--daemonize'
+      $options.daemonize = true
+    when '--debug'
+      $options.debug = true
+      $logger.level = Logger::DEBUG
+    when '--dry-run'
+      $options.dry_run = true
+      $options.debug = true
+      $logger.level = Logger::DEBUG
     when '--interval'
       $options.interval = arg
     when '--once'
@@ -221,9 +238,6 @@ begin
     when '--version'
       $stdout.puts 0.1
       exit 0
-    when '--debug'
-      $options.debug = true
-      $logger.level = Logger::DEBUG
     when '--help'
       $stdout.puts HELP
       exit 0
@@ -233,11 +247,9 @@ begin
   shutdown = false
 
   Signal.trap('TERM') do
-    $logger.info "Service terminated."
     exit 0
   end
   Signal.trap('INT') do
-    $logger.info "Wait for shutdown..."
     shutdown = true
   end
  
