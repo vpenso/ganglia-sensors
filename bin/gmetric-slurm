@@ -116,6 +116,7 @@ class Ganglia
   def job_states
     Slurm::Jobs::states.each_pair do |state,count|
       command = %Q[gmetric --group=slurm --type=uint32 --name=jobs_#{state} --value=#{count}]
+      System::exec(command)
     end
   end
 
