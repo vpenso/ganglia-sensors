@@ -3,8 +3,9 @@
    "report_type" : "standard",
    "title" : "Compute Jobs in Slurm",
    "vertical_label" : "Number of Jobs",
+   "show_total": "1",
    "series" : [
-      { "metric": "jobs_pending", "color": "33cc33", "label": "Pending", "line_width": "1", "type": "line" },
-      { "metric": "jobs_running", "color": "5555cc", "label": "Running", "line_width": "1", "type": "line" }
+      { "metric": "jobs_running", "color": "1e90ffa6", "label": "Run  ", "line_width": "1", "type": "stack" },
+      { "metric": "jobs_pending", "color": "afeeffa6", "label": "Pend ", "line_width": "1", "type": "stack" }
    ]
 }
