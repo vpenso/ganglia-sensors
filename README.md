@@ -137,6 +137,7 @@ Extension code for the Ganglia [Web Frontend](https://github.com/ganglia/ganglia
 File | Description
 -----|--------------------
 [infiniband_report.json](etc/graph.d/infiniband_report.json) | Incoming and outgoing traffic on an Infiniband adapter in bytes per second
+[slurm_job_states_report.json](etc/graph.d/slurm_job_states_report.json) | Number of running/pending jobs in Slurm 
 
 ### Configuration
 
