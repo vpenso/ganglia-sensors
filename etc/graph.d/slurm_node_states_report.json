@@ -1,0 +1,14 @@
+{
+   "report_name" : "slurm_node_states_report",
+   "report_type" : "standard",
+   "title" : "Compute Nodes in Slurm",
+   "vertical_label" : "Number of Nodes",
+   "show_total": "1",
+   "series" : [
+      { "metric": "nodes_down", "color": "990000a6", "label": "Down", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_drain", "color": "dc143ca6", "label": "Drain", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_alloc", "color": "1e90ffa6", "label": "Alloc", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_comp", "color": "87cefaa6", "label": "Comp", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_idle", "color": "afeeffa6", "label": "Idle", "line_width": "1", "type": "stack" }
+   ]
+}
