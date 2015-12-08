@@ -100,7 +100,7 @@ module Slurm
 
     def self.states
       raise('Command [sinfo] not in path!') unless System.command? 'sinfo' 
-      command = %q{sinfo -h -o '%n,%T'}
+      command = %q{sinfo -h -o '%n,%T' | sort | uniq}
       output = System.exec(command)
       unless output.nil?
         states = { alloc: 0, comp: 0, down: 0, drain: 0, idle: 0 }
@@ -224,7 +224,7 @@ begin
   $options.log_file = String.new
   
   $options.error_counters = false
-  $options.interval = 20
+  $options.interval = 10
 
   $logger = Logger.new(STDOUT)
   # Adjust the time format used for the logger
