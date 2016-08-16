@@ -1,0 +1,9 @@
+[Unit]
+Description=Ganglia Monitor SLURM
+
+[Service]
+ExecStart=/usr/sbin/ganglia-monitor-slurm --log-level=info
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
