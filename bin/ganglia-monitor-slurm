@@ -16,11 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+VERSION='1.0.1'
 
 require 'rubygems'
 require 'ostruct'
 require 'logger'
-require 'getoptlong' 
+require 'getoptlong'
 require 'socket'
 require 'json'
 
@@ -40,7 +41,7 @@ module System
 
   def self.exec(command)
     command = command.gsub(/\n/," ").strip.gsub(/\s+/,' ')
-    command + ' 2>&1'
+    command += ' 2>&1'
     $logger.debug "Exec [#{command}]"
     # Execute command as subprocess and return the exit code
     pipe = IO.popen(command)
@@ -67,45 +68,64 @@ module Slurm
   module Jobs
 
     def self.states
-      raise('Command [squeue] not in path!') unless System.command? 'squeue' 
+      raise('Command [squeue] not in path!') unless System.command? 'squeue'
       command = %q{squeue -h -o '%A,%T'}
       output = System.exec(command)
       unless output.nil?
         states = {
-          pending: 0, 
+          pending: 0,
           running: 0,
-          suspended: 0, 
-          cancelled: 0, 
-          completing: 0, 
-          completed: 0, 
-          configuring: 0, 
-          failed: 0, 
-          timeout: 0, 
-          preempted: 0, 
+          suspended: 0,
+          cancelled: 0,
+          completing: 0,
+          completed: 0,
+          configuring: 0,
+          failed: 0,
+          timeout: 0,
+          preempted: 0,
           node_fail: 0,
           special_exit: 0
         }
         output.split("\n").each do |line|
-          job_id, state =  line.split(',')
+          _job_id, state =  line.split(',')
           states[state.downcase.to_sym] += 1
         end
         return states
       end
       return nil
-    end 
+    end
 
   end
 
   module Nodes
 
-    def self.states
-      raise('Command [sinfo] not in path!') unless System.command? 'sinfo' 
-      command = %q{sinfo -h -o '%n,%T' | sort | uniq}
-      output = System.exec(command)
+    module_function
+
+    def states(pattern)
+
+      raise('Command [sinfo] not in path!') unless System.command? 'sinfo'
+
+      output = System.exec("sinfo -h -o '%n,%T' | sort | uniq")
+
       unless output.nil?
-        states = { alloc: 0, comp: 0, down: 0, drain: 0, idle: 0 }
+
+        states = {
+          alloc: 0,
+          comp: 0,
+          down: 0,
+          drain: 0,
+          fail: 0,
+          idle: 0,
+          maint: 0,
+          resv: 0
+        }
+
         output.split("\n").each do |line|
+
           node, state =  line.split(',')
+
+          next unless node =~ /^#{pattern}/
+
           case state
           when /^alloc/,/^mix/
             states[:alloc] += 1
@@ -115,15 +135,109 @@ module Slurm
             states[:down] += 1
           when /^drain/
             states[:drain] += 1
+          when /^fail/,/^err/
+            states[:fail] += 1
           when /^idle/
             states[:idle] += 1
+          when /^maint/
+            states[:maint] += 1
+          when /^resv/
+            states[:resv] += 1
           else
             $logger.debug %Q[Node state "#{state}" is not supported]
           end
         end
+
         return states
+
       end
+
       return nil
+
+    end
+
+    def utilization(pattern)
+
+      # List of all nodes an their configuration in Slurm
+      nodes = Hash.new
+
+      # Query the cluster controller
+      command = %q{scontrol show node --all --details --oneliner}
+      System.exec(command).split("\n").each do |line|
+
+        #
+        # Use the node name as hash key
+        #
+        name = String.new
+
+        #
+        # Iterate over all node "key=value" elements
+        #
+        line.split(' ').each do |elem|
+
+          key,value = elem.split('=')
+          key = key.downcase
+          case key
+          when 'nodename'
+            #
+            # Set the node name, which is always the first element per line
+            #
+            name = value
+            nodes[name] = Hash.new unless nodes.has_key? name
+          else
+            #
+            # All other elements are key -> value anchored to the node name
+            #
+            nodes[name][key] = value
+          end
+        end
+
+      end
+
+      metrics = {
+        'nodes' => 0,
+        'nodes_alloc' => 0,
+        'nodes_idle' => 0,
+        'nodes_maint' => 0,
+        'cores' => 0,
+        'cores_avail' => 0,
+        'cpus_alloc' => 0,
+        'cpus_load' => 0
+      }
+
+      nodes.each do |node,config|
+
+        next unless node =~ /^#{pattern}/
+
+        metrics['nodes'] += 1
+
+        cores = config['sockets'].to_i * config['corespersocket'].to_i
+
+        metrics['cores'] += cores
+
+        # Normalize the number of CPUs/threads to the number of cores
+        metrics['cpus_alloc'] += config['cpualloc'].to_i / config['threadspercore'].to_i
+        metrics['cpus_load'] += config['cpuload'].to_i
+
+        #
+        # The number of available cores includes only nodes
+        # not in maintenance, e.g. drain or down
+        #
+        case config['state'].downcase
+        when /^alloc/, /^mix/
+          metrics['nodes_alloc'] += 1
+          metrics['cores_avail'] += cores
+        when /^idle/
+          metrics['nodes_idle'] += 1
+          metrics['cores_avail'] += cores
+        else
+          metrics['nodes_maint'] += 1
+        end
+
+      end
+
+      return metrics
+
     end
 
   end
@@ -132,20 +246,26 @@ end
 
 class Ganglia
 
-  def initialize 
+  NODE_GROUPS = %w(
+    lxbk
+    lxlcsc
+  )
+
+  def initialize
     raise("Command [gmetric] not in path!") unless System.command? 'gmetric'
   end
 
   def gmetric
     job_states
     node_states
+    node_utilization
   end
 
   private
 
   # Wrap System::exec to support a dry-run option for all gmetric commands
   def exec(command)
-    command = %Q[gmetric --group=slurm #{command}]
+    command = %Q[gmetric --group=slurm #{command} --tmax=#{$options.interval * 2} --dmax=#{$options.interval * 2}]
     if $options.dry_run
       $logger.debug "Exec [#{command}]"
     else
@@ -163,10 +283,23 @@ class Ganglia
   end
 
   def node_states
-    states = Slurm::Nodes::states
-    unless states.nil?
-      states.each_pair do |state,count|
-        exec %Q[--type=uint32 --name=nodes_#{state} --value=#{count}]
+    NODE_GROUPS.each do |pattern|
+      metrics = Slurm::Nodes::states(pattern)
+      unless metrics.nil?
+        metrics.each_pair do |metric,value|
+          exec %Q[--type=uint32 --name=nodes_#{pattern}_#{metric} --value=#{value}]
+        end
+      end
+    end
+  end
+
+  def node_utilization
+    NODE_GROUPS.each do |pattern|
+      metrics = Slurm::Nodes::utilization(pattern)
+      unless metrics.nil?
+        metrics.each_pair do |metric,value|
+          exec %Q[--type=uint32 --name=nodes_#{pattern}_#{metric} --value=#{value}]
+        end
       end
     end
   end
@@ -186,12 +319,12 @@ Send Slurm metrics to Ganglia
 Options
 -------
 
-  --daemonize, -D 
+  --daemonize, -D
     Background daemon process.
   --debug, -d
     Show stacktraces in case of errors.
   --dry-run
-    Enable debug mode, and do not send metrics to Ganglia. 
+    Enable debug mode, and do not send metrics to Ganglia.
   --interval, -i SECONDS
     Time interval to send data to Ganglia (default = 20).
   --help, -h
@@ -202,7 +335,7 @@ Options
   --log-level, -L debug|info|warn|fatal
     Verbosity of the logging output.
   --pid-file, -p PATH:
-    Path to a file storing the process ID when executed as 
+    Path to a file storing the process ID when executed as
     daemon (default to /var/run/#{exec_name}.pid)
   --version, v
     Print program version.
@@ -210,7 +343,7 @@ EOF
 
 begin
 
-  # Unlikely to be used by a daemon 
+  # Unlikely to be used by a daemon
   #stdin = $stdin.tty? ? String.new : $stdin.read
 
   $DEBUG = false
@@ -218,13 +351,12 @@ begin
   $options = OpenStruct.new
   $options.debug = false
   $options.dry_run = false
-  $options.interval = 300
+  $options.interval = 20
   $options.daemonize = false
   $options.pid_file = String.new
   $options.log_file = String.new
-  
+
   $options.error_counters = false
-  $options.interval = 10
 
   $logger = Logger.new(STDOUT)
   # Adjust the time format used for the logger
@@ -275,7 +407,7 @@ begin
          end
       $options.debug = true if arg == 'debug'
     when '--version'
-      $stdout.puts 0.1
+      $stdout.puts VERSION
       exit 0
     when '--help'
       $stdout.puts HELP
@@ -293,7 +425,7 @@ begin
     shutdown = true
     Thread.new { $logger.info "Stopping service in #{$options.interval} seconds..." }
   end
- 
+
   if $options.daemonize
     if RUBY_VERSION < '1.9'
       exit if fork
