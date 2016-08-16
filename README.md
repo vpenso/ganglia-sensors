@@ -57,8 +57,8 @@ It is common to use **cron** to execute a script within an interval to send moni
 
 Program | Description
 --------|---------------------
-[gmetric-infiniband](bin/gmetric-infiniband) | Collect Infiniband channel adapter metrics with `perfquery`  
-[gmetric-slurm](bin/gmetric-slurm) | Collect jobs, node and scheduler statistics from [Slurm](https://github.com/SchedMD/slurm) 
+[ganglia-monitor-infiniband](bin/ganglia-monitor-infiniband) | Collect Infiniband channel adapter metrics with `perfquery`  
+[ganglia-monitor-slurm](bin/ganglia-monitor-slurm) | Collect jobs, node and scheduler statistics from [Slurm](https://github.com/SchedMD/slurm) 
 
 
 ## Gmond Modules
