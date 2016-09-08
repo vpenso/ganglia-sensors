@@ -65,13 +65,13 @@ end
 module Slurm
 
   def self.sdiag
-    # query information from slurm
+    # query information from Slurm
     output = System.exec('sdiag')
     return nil if output.nil?
-    metrics = Hash.new
     prefix = 'scheduler'
-    # iterate of the data
     lines = output.split("\n")
+    # Extract required data
+    metrics = Hash.new
     metrics["#{prefix}_threads"] = lines[4].split(':')[-1].to_i
     metrics["#{prefix}_queue_size"] = lines[5].split(':')[-1].to_i
     metrics["#{prefix}_last_cycle"] = lines[12].split(':')[-1].to_i
@@ -304,13 +304,13 @@ class Ganglia
   def scheduler
     metrics = Slurm::sdiag
     return if metrics.nil?
-    metrics.each_pair { |m,v| gmetric m, v }
+    metrics.each { |m,v| gmetric m, v }
   end
 
   def jobs
     metrics = Slurm::Jobs::states
     return if metrics.nil?
-    metrics.each_pair { |m,v| gmetric "jobs_#{m}",v }
+    metrics.each { |m,v| gmetric "jobs_#{m}",v }
   end
 
   def states
@@ -318,17 +318,16 @@ class Ganglia
       metrics = Slurm::Nodes::states(pattern)
       next if metrics.nil?
       pattern = "#{pattern}_" unless pattern.nil?
-      metrics.each_pair { |m,v| gmetric "nodes_#{pattern}#{m}", v } 
+      metrics.each { |m,v| gmetric "nodes_#{pattern}#{m}", v } 
     end
   end
 
   def utilization
     @node_patterns.each do |pattern|
-      puts pattern
       metrics = Slurm::Nodes::utilization(pattern)
       next if metrics.nil?
       pattern = "#{pattern}_" unless pattern.nil?
-      metrics.each_pair { |m,v| gmetric "nodes_#{pattern}#{m}",v }
+      metrics.each { |m,v| gmetric "nodes_#{pattern}#{m}",v }
     end
   end
 
