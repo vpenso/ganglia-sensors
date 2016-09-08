@@ -65,6 +65,25 @@ end
 
 module Slurm
 
+  def self.sdiag
+    # query information from slurm
+    output = System.exec('sdiag')
+    return nil if output.nil?
+    metrics = Hash.new
+    prefix = 'scheduler'
+    # iterate of the data
+    lines = output.split("\n")
+    metrics["#{prefix}_threads"] = lines[4].split(':')[-1].to_i
+    metrics["#{prefix}_queue_size"] = lines[5].split(':')[-1].to_i
+    metrics["#{prefix}_last_cycle"] = lines[12].split(':')[-1].to_i
+    metrics["#{prefix}_mean_cycle"] = lines[15].split(':')[-1].to_i
+    metrics["#{prefix}_cycle_per_minute"] = lines[17].split(':')[-1].to_i
+    metrics["#{prefix}_backfill_last_cycle"] = lines[24].split(':')[-1].to_i
+    metrics["#{prefix}_backfill_mean_cycle"] = lines[26].split(':')[-1].to_i
+    metrics["#{prefix}_backfill_depth_mean"] = lines[29].split(':')[-1].to_i
+    return metrics
+  end
+
   module Jobs
 
     def self.states
@@ -124,7 +143,9 @@ module Slurm
 
           node, state =  line.split(',')
 
-          next unless node =~ /^#{pattern}/
+          unless pattern.nil?
+            next unless node =~ /^#{pattern}/
+          end
 
           case state
           when /^alloc/,/^mix/
@@ -207,7 +228,9 @@ module Slurm
 
       nodes.each do |node,config|
 
-        next unless node =~ /^#{pattern}/
+        unless pattern.nil?
+          next unless node =~ /^#{pattern}/
+        end
 
         metrics['nodes'] += 1
 
@@ -246,26 +269,32 @@ end
 
 class Ganglia
 
-  NODE_GROUPS = %w(
-    lxbk
-    lxlcsc
-  )
-
-  def initialize
+  def initialize(node_patterns = [nil])
     raise("Command [gmetric] not in path!") unless System.command? 'gmetric'
+    @prefix = 'slurm'
+    @node_patterns = node_patterns
   end
 
-  def gmetric
-    job_states
+  def metrics
+    sdiag
+    jobs
     node_states
-    node_utilization
+    utilization
   end
 
   private
 
   # Wrap System::exec to support a dry-run option for all gmetric commands
-  def exec(command)
-    command = %Q[gmetric --group=slurm #{command} --tmax=#{$options.interval * 2} --dmax=#{$options.interval * 2}]
+  def gmetric(name, value, type = 'uint32')
+    command = %Q[
+      gmetric
+        --group=slurm
+        --type=#{type}
+        --tmax=#{$options.interval * 2}
+        --dmax=#{$options.interval * 2}
+        --name=#{name}
+        --value=#{value}
+    ].gsub(/^  */,'').gsub(/\n/,' ')
     if $options.dry_run
       $logger.debug "Exec [#{command}]"
     else
@@ -273,41 +302,46 @@ class Ganglia
     end
   end
 
-  def job_states
-    states = Slurm::Jobs::states
-    unless states.nil?
-      states.each_pair do |state,count|
-        exec %Q[--type=uint32 --name=jobs_#{state} --value=#{count}]
-      end
+  def sdiag
+    metrics = Slurm::sdiag
+    return if metrics.nil?
+    metrics.each_pair do |metric,value|
+      gmetric metric, value
+    end
+  end
+
+  def jobs
+    metrics = Slurm::Jobs::states
+    return if metrics.nil?
+    metrics.each_pair do |metric,value|
+      gmetric "jobs_#{metric}",value 
     end
   end
 
   def node_states
-    NODE_GROUPS.each do |pattern|
+    @node_patterns.each do |pattern|
       metrics = Slurm::Nodes::states(pattern)
-      unless metrics.nil?
-        metrics.each_pair do |metric,value|
-          exec %Q[--type=uint32 --name=nodes_#{pattern}_#{metric} --value=#{value}]
-        end
+      next if metrics.nil?
+      pattern = "#{pattern}_" unless pattern.nil?
+      metrics.each_pair do |metric,value|
+        gmetric "nodes_#{pattern}#{metric}", value
       end
     end
   end
 
-  def node_utilization
-    NODE_GROUPS.each do |pattern|
+  def utilization
+    @node_patterns.each do |pattern|
+      puts pattern
       metrics = Slurm::Nodes::utilization(pattern)
-      unless metrics.nil?
-        metrics.each_pair do |metric,value|
-          exec %Q[--type=uint32 --name=nodes_#{pattern}_#{metric} --value=#{value}]
-        end
+      next if metrics.nil?
+      pattern = "#{pattern}_" unless pattern.nil?
+      metrics.each_pair do |metric,value|
+        gmetric "nodes_#{pattern}#{metric}",value
       end
     end
   end
 
 end
-
-
-
 
 exec_name = File.split(__FILE__)[-1]
 HELP = <<EOF
@@ -334,6 +368,8 @@ Options
     to /var/log/#{exec_name}.log).
   --log-level, -L debug|info|warn|fatal
     Verbosity of the logging output.
+  --node-patterns, -n pattern[,pattern[,...]]
+    Seperated metrics for groups of nodes.
   --pid-file, -p PATH:
     Path to a file storing the process ID when executed as
     daemon (default to /var/run/#{exec_name}.pid)
@@ -353,8 +389,9 @@ begin
   $options.dry_run = false
   $options.interval = 20
   $options.daemonize = false
-  $options.pid_file = String.new
   $options.log_file = String.new
+  $options.node_patterns = nil
+  $options.pid_file = String.new
 
   $options.error_counters = false
 
@@ -375,6 +412,7 @@ begin
     ['--interval','-i',GetoptLong::REQUIRED_ARGUMENT],
     ['--log-file','-l',GetoptLong::REQUIRED_ARGUMENT],
     ['--log-level','-L',GetoptLong::REQUIRED_ARGUMENT],
+    ['--node-patterns','-n',GetoptLong::REQUIRED_ARGUMENT],
     ['--pid-file','-p',GetoptLong::REQUIRED_ARGUMENT],
     ['--version','-v',GetoptLong::NO_ARGUMENT]
   ).each do |opt,arg|
@@ -406,6 +444,8 @@ begin
            Logger::INFO
          end
       $options.debug = true if arg == 'debug'
+    when '--node-patterns'
+      $options.node_patterns = arg.split(',')
     when '--version'
       $stdout.puts VERSION
       exit 0
@@ -452,11 +492,16 @@ begin
     $logger.info "Writing log into #{$options.log_file}"
   end
 
-  ganglia = Ganglia.new
+
+  ganglia = if $options.node_patterns.nil? 
+              Ganglia.new
+            else
+              Ganglia.new($options.node_patterns)
+            end
 
   while(true)
     break if shutdown
-    ganglia.gmetric
+    ganglia.metrics
     sleep $options.interval - 1
   end
   $logger.info "Service stopped!"
