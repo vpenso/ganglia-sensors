@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-VERSION='1.0.1'
 
 require 'rubygems'
 require 'ostruct'
@@ -276,9 +275,9 @@ class Ganglia
   end
 
   def metrics
-    sdiag
+    scheduler
     jobs
-    node_states
+    states
     utilization
   end
 
@@ -294,38 +293,32 @@ class Ganglia
         --dmax=#{$options.interval * 2}
         --name=#{name}
         --value=#{value}
-    ].gsub(/^  */,'').gsub(/\n/,' ')
+    ]
     if $options.dry_run
-      $logger.debug "Exec [#{command}]"
+      $logger.debug "Exec [#{command.gsub(/\n/," ").strip.gsub(/\s+/,' ')}]"
     else
       System::exec(command)
     end
   end
 
-  def sdiag
+  def scheduler
     metrics = Slurm::sdiag
     return if metrics.nil?
-    metrics.each_pair do |metric,value|
-      gmetric metric, value
-    end
+    metrics.each_pair { |m,v| gmetric m, v }
   end
 
   def jobs
     metrics = Slurm::Jobs::states
     return if metrics.nil?
-    metrics.each_pair do |metric,value|
-      gmetric "jobs_#{metric}",value 
-    end
+    metrics.each_pair { |m,v| gmetric "jobs_#{m}",v }
   end
 
-  def node_states
+  def states
     @node_patterns.each do |pattern|
       metrics = Slurm::Nodes::states(pattern)
       next if metrics.nil?
       pattern = "#{pattern}_" unless pattern.nil?
-      metrics.each_pair do |metric,value|
-        gmetric "nodes_#{pattern}#{metric}", value
-      end
+      metrics.each_pair { |m,v| gmetric "nodes_#{pattern}#{m}", v } 
     end
   end
 
@@ -335,9 +328,7 @@ class Ganglia
       metrics = Slurm::Nodes::utilization(pattern)
       next if metrics.nil?
       pattern = "#{pattern}_" unless pattern.nil?
-      metrics.each_pair do |metric,value|
-        gmetric "nodes_#{pattern}#{metric}",value
-      end
+      metrics.each_pair { |m,v| gmetric "nodes_#{pattern}#{m}",v }
     end
   end
 
@@ -392,7 +383,6 @@ begin
   $options.log_file = String.new
   $options.node_patterns = nil
   $options.pid_file = String.new
-
   $options.error_counters = false
 
   $logger = Logger.new(STDOUT)
@@ -447,7 +437,7 @@ begin
     when '--node-patterns'
       $options.node_patterns = arg.split(',')
     when '--version'
-      $stdout.puts VERSION
+      $stdout.puts '2.0'
       exit 0
     when '--help'
       $stdout.puts HELP
@@ -491,7 +481,6 @@ begin
     $stderr.reopen($stdout)
     $logger.info "Writing log into #{$options.log_file}"
   end
-
 
   ganglia = if $options.node_patterns.nil? 
               Ganglia.new
