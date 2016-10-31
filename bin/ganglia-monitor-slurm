@@ -35,6 +35,7 @@ module System
   def self.command?(command)
     `which #{command}`
     return true if $?.success?
+    $logger.warn "Command [#{command}] not in PATH"
     return false
   end
 
@@ -66,6 +67,7 @@ module Slurm
 
   def self.sdiag
     # query information from Slurm
+    return nil unless System.command? 'sdiag'
     output = System.exec('sdiag')
     return nil if output.nil?
     prefix = 'scheduler'
@@ -86,33 +88,30 @@ module Slurm
   module Jobs
 
     def self.states
-      raise('Command [squeue] not in path!') unless System.command? 'squeue'
-      command = %q{squeue -h -o '%A,%T'}
-      output = System.exec(command)
-      unless output.nil?
-        states = {
-          pending: 0,
-          running: 0,
-          suspended: 0,
-          cancelled: 0,
-          completing: 0,
-          completed: 0,
-          configuring: 0,
-          failed: 0,
-          timeout: 0,
-          preempted: 0,
-          node_fail: 0,
-          special_exit: 0
-        }
-        output.split("\n").each do |line|
-          _job_id, state =  line.split(',')
-          states[state.downcase.to_sym] += 1
-        end
-        return states
-      end
-      return nil
-    end
+      return nil unless System.command? 'squeue'
+      output = System.exec("squeue -h -o '%A,%T'")
+      return nil if output.nil?
 
+      states = {
+        pending: 0,
+        running: 0,
+        suspended: 0,
+        cancelled: 0,
+        completing: 0,
+        completed: 0,
+        configuring: 0,
+        failed: 0,
+        timeout: 0,
+        preempted: 0,
+        node_fail: 0,
+        special_exit: 0
+      }
+      output.split("\n").each do |line|
+        _job_id, state =  line.split(',')
+        states[state.downcase.to_sym] += 1
+      end
+      return states
+    end
   end
 
   module Nodes
@@ -121,69 +120,67 @@ module Slurm
 
     def states(pattern)
 
-      raise('Command [sinfo] not in path!') unless System.command? 'sinfo'
-
+      # Query Slurm if possible
+      #
+      return nil unless System.command? 'sinfo'
       output = System.exec("sinfo -h -o '%n,%T' | sort | uniq")
+      return nil if output.nil?  
 
-      unless output.nil?
+      states = {
+        alloc: 0,
+        comp: 0,
+        down: 0,
+        drain: 0,
+        fail: 0,
+        idle: 0,
+        maint: 0,
+        resv: 0
+      }
 
-        states = {
-          alloc: 0,
-          comp: 0,
-          down: 0,
-          drain: 0,
-          fail: 0,
-          idle: 0,
-          maint: 0,
-          resv: 0
-        }
+      output.split("\n").each do |line|
 
-        output.split("\n").each do |line|
+        node, state =  line.split(',')
 
-          node, state =  line.split(',')
-
-          unless pattern.nil?
-            next unless node =~ /^#{pattern}/
-          end
-
-          case state
-          when /^alloc/,/^mix/
-            states[:alloc] += 1
-          when /^comp/
-            states[:comp] += 1
-          when /^down/
-            states[:down] += 1
-          when /^drain/
-            states[:drain] += 1
-          when /^fail/,/^err/
-            states[:fail] += 1
-          when /^idle/
-            states[:idle] += 1
-          when /^maint/
-            states[:maint] += 1
-          when /^resv/
-            states[:resv] += 1
-          else
-            $logger.debug %Q[Node state "#{state}" is not supported]
-          end
+        unless pattern.nil?
+          next unless node =~ /^#{pattern}/
         end
 
-        return states
-
+        case state
+        when /^alloc/,/^mix/
+          states[:alloc] += 1
+        when /^comp/
+          states[:comp] += 1
+        when /^down/
+          states[:down] += 1
+        when /^drain/
+          states[:drain] += 1
+        when /^fail/,/^err/
+          states[:fail] += 1
+        when /^idle/
+          states[:idle] += 1
+        when /^maint/
+          states[:maint] += 1
+        when /^resv/
+          states[:resv] += 1
+        else
+          $logger.debug %Q[Node state "#{state}" is not supported]
+        end
       end
 
-      return nil
+      return states
 
     end
 
     def utilization(pattern)
 
+      return nil unless System.command? 'scontrol'
+      output = System.exec('scontrol show node --all --details --oneliner')
+      return nil if output.nil?
+
       # List of all nodes an their configuration in Slurm
       nodes = Hash.new
 
-      # Query the cluster controller
-      command = %q{scontrol show node --all --details --oneliner}
-      System.exec(command).split("\n").each do |line|
+      output.split("\n").each do |line|
 
         #
         # Use the node name as hash key
@@ -269,7 +266,6 @@ end
 class Ganglia
 
   def initialize(node_patterns = [nil])
-    raise("Command [gmetric] not in path!") unless System.command? 'gmetric'
     @prefix = 'slurm'
     @node_patterns = node_patterns
   end
@@ -285,6 +281,9 @@ class Ganglia
 
   # Wrap System::exec to support a dry-run option for all gmetric commands
   def gmetric(name, value, type = 'uint32')
+    unless System.command? 'gmetric'
+      $logger.fatal "Can not send data to Ganglia!"
+    end
     command = %Q[
       gmetric
         --group=slurm
