@@ -13,7 +13,6 @@ Program | Description
 [ganglia-monitor-infiniband](bin/ganglia-monitor-infiniband) | Collect Infiniband channel adapter metrics with `perfquery`  
 [ganglia-monitor-slurm](bin/ganglia-monitor-slurm) | Collect jobs, node and scheduler statistics from [Slurm](https://github.com/SchedMD/slurm) 
 
-
 ## Modules
 
 Ganglia can be extended by Python and C/C++ modules. Modules are executed (in intervals) by gmond in contrast to data collected with gmetric. The Debian package **ganglia-monitor-python** provides the required environment to enable Python modules.
@@ -120,6 +119,16 @@ Deploy custom composite graphs:
 1. Copy the JSON configuration file into the directory `/usr/share/ganglia-webfrontend/graph.d` on the server hosting the web frontend.
 2. Enable a graph using the "Edit Optional Graphs" button in the user interface of the web frontend.
 
+## Packages
+
+Create Debian package with the configuration in [debian/](debian/)
+
+```
+apt -y install debhelper devscripts
+dch -i                                             # adjust changelog if required
+dpkg-buildpackage -b -us -uc -tc                   # build package
+dpkg -c ../ganglia-monitor-slurm_*_all.deb         # list package content
+```
 
 
 ## License
