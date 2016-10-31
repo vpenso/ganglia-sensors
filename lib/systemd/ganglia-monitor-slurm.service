@@ -4,6 +4,7 @@ Description=Ganglia Monitor SLURM
 [Service]
 ExecStart=/usr/sbin/ganglia-monitor-slurm --log-level=info
 Restart=always
+RestartSec=15
 
 [Install]
 WantedBy=multi-user.target
