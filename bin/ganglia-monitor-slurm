@@ -363,7 +363,7 @@ Options
   --pid-file, -p PATH:
     Path to a file storing the process ID when executed as
     daemon (default to /var/run/#{exec_name}.pid)
-  --version, v
+  --version, -v
     Print program version.
 EOF
 

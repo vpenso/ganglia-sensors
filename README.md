@@ -4,9 +4,9 @@ This repository contains code used to collect monitoring metrics for [Ganglia](h
 
 > Ganglia is a scalable distributed monitoring system for high-performance computing systems such as clusters and Grids. […] It uses carefully engineered data structures and algorithms to achieve very low per-node overheads and high concurrency. [cf.](http://ganglia.info/)
 
-## Deamons
+## Daemons
 
-It is common to use **cron** to execute a script within an interval to send monitoring information with [gmetric](docs/gmetric.md). Alternatively it is possible to daemonice the collection script itself.
+Send monitoring information to Ganglia with [gmetric](docs/gmetric.md):
 
 Program | Description
 --------|---------------------
