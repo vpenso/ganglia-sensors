@@ -1,0 +1,17 @@
+Source: ganglia-monitor-slurm
+Section: net
+Priority: optional
+Maintainer: Victor Penso <vic.penso@gmail.com>
+Build-Depends: debhelper (>= 9), dh-systemd
+Standards-Version: 3.9.6
+Homepage: https://github.com/vpenso/ganglia-sensors
+Vcs-Git: https://github.com/vpenso/ganglia-sensors.git
+Vcs-Browser: https://github.com/vpenso/ganglia-sensors
+
+Package: ganglia-monitor-slurm
+Architecture: all
+Depends: ${misc:Depends}, ganglia-monitor, ruby
+Suggests: slurm-client
+Description: GSI Ganglia SLURM sensor
+ Monitors the GSI SLURM master and sends information
+ to Ganglia with the gmetric cli.

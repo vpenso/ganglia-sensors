@@ -1,0 +1,19 @@
+ganglia-monitor-slurm (1.0.2-1) unstable; urgency=medium
+
+  [ Dennis Klein ]
+  * Wait 15 seconds before restarting the sensor
+
+ -- Dennis Klein <d.klein@gsi.de>  Tue, 04 Oct 2016 14:44:00 +0200
+
+ganglia-monitor-slurm (1.0.1-1) unstable; urgency=medium
+
+  [ Victor Penso ]
+  * Add couple of additional states to be monitored
+
+ -- Victor Penso <v.penso@gsi.de>  Tue, 16 Aug 2016 14:16:21 +0200
+
+ganglia-monitor-slurm (1.0.0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Dennis Klein <d.klein@gsi.de>  Mon, 25 Jul 2016 18:51:56 +0200

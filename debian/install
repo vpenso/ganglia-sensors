@@ -1,0 +1,2 @@
+bin/ganglia-monitor-slurm /usr/sbin
+lib/systemd/ganglia-monitor-slurm.service /lib/systemd/system
