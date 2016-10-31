@@ -1,3 +1,11 @@
+ganglia-monitor-slurm (2.0-1) jessie; urgency=medium
+
+  [Victor Penso]
+  * Support scheduler metrics
+  * Support node groups by command option
+
+ -- Victor Penso <vic.penso@gmail.com>  Mon, 31 Oct 2016 13:33:33 +0100
+
 ganglia-monitor-slurm (1.0.2-1) unstable; urgency=medium
 
   [ Dennis Klein ]
