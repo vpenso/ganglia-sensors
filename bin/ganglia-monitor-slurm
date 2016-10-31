@@ -120,8 +120,6 @@ module Slurm
 
     def states(pattern)
 
-      # Query Slurm if possible
-      #
       return nil unless System.command? 'sinfo'
       output = System.exec("sinfo -h -o '%n,%T' | sort | uniq")
       return nil if output.nil?  
@@ -141,7 +139,7 @@ module Slurm
 
         node, state =  line.split(',')
 
-        unless pattern.nil?
+        if pattern != 'all'
           next unless node =~ /^#{pattern}/
         end
 
@@ -224,7 +222,7 @@ module Slurm
 
       nodes.each do |node,config|
 
-        unless pattern.nil?
+        if pattern != 'all'
           next unless node =~ /^#{pattern}/
         end
 
@@ -358,12 +356,12 @@ Options
   --log-level, -L debug|info|warn|fatal
     Verbosity of the logging output.
   --node-patterns, -n pattern[,pattern[,...]]
-    Seperated metrics for groups of nodes.
+    Seperated node metrics based on the node names
   --pid-file, -p PATH:
     Path to a file storing the process ID when executed as
     daemon (default to /var/run/#{exec_name}.pid)
   --version, -v
-    Print program version.
+    Print program version
 EOF
 
 begin
@@ -379,7 +377,7 @@ begin
   $options.interval = 20
   $options.daemonize = false
   $options.log_file = String.new
-  $options.node_patterns = nil
+  $options.node_patterns = ['all']
   $options.pid_file = String.new
   $options.error_counters = false
 
@@ -433,7 +431,7 @@ begin
          end
       $options.debug = true if arg == 'debug'
     when '--node-patterns'
-      $options.node_patterns = arg.split(',')
+      $options.node_patterns += arg.split(',')
     when '--version'
       $stdout.puts '2.0'
       exit 0
