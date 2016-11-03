@@ -1,0 +1,11 @@
+{
+   "report_name" : "slurm_scheduler_backfill",
+   "report_type" : "standard",
+   "title" : "Slurm Scheduler Backfill",
+   "vertical_label" : "Microseconds",
+   "series" : [
+      { "metric": "scheduler_backfill_mean_cycle", "color": "87cefaa6", "label": "Cycles Mean", "line_width": "1", "type": "stack" },
+      { "metric": "scheduler_backfill_last_cycle", "color": "0000ff", "label": "Cycles Last", "line_width": "1", "type": "line" },
+      { "metric": "scheduler_backfill_depth_mean", "color": "dc143c", "label": "Depth Mean", "line_width": "0", "type": "line" }
+   ]
+}

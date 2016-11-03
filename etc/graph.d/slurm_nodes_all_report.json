@@ -1,0 +1,17 @@
+{
+   "report_name" : "slurm_nodes_all",
+   "report_type" : "standard",
+   "title" : "Execution Nodes",
+   "vertical_label" : "Number of Nodes",
+   "show_total": "1",
+   "series" : [
+      { "metric": "nodes_all_down", "color": "990000a6", "label": "Down", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_all_fail", "color": "ff0000a6", "label": "Fail", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_all_drain", "color": "dc143ca6", "label": "Drain", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_all_maint", "color": "ff7f50a6", "label": "Maint", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_all_alloc", "color": "1e90ffa6", "label": "Alloc", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_all_comp", "color": "87cefaa6", "label": "Comp", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_all_resv", "color": "00bfffa6", "label": "Resv", "line_width": "1", "type": "stack" },
+      { "metric": "nodes_all_idle", "color": "afeeffa6", "label": "Idle", "line_width": "1", "type": "stack" }
+   ]
+}

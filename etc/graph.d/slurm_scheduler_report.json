@@ -1,0 +1,12 @@
+{
+   "report_name" : "slurm_scheduler",
+   "report_type" : "standard",
+   "title" : "Slurm Scheduler",
+   "vertical_label" : "Microseconds",
+   "series" : [
+      { "metric": "scheduler_mean_cycle", "color": "87cefaa6", "label": "Cycles Mean", "line_width": "1", "type": "stack" },
+      { "metric": "scheduler_last_cycle", "color": "0000ff", "label": "Cycles Last", "line_width": "1", "type": "line" },
+      { "metric": "scheduler_cycle_per_minute", "color": "dc143c", "label": "Cycles/Min.", "line_width": "0", "type": "line" },
+      { "metric": "scheduler_threads", "color": "ff6347", "label": "Threads", "line_width": "0", "type": "line" }
+   ]
+}

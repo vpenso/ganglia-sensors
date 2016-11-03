@@ -5,7 +5,8 @@
    "vertical_label" : "Number of Jobs",
    "show_total": "1",
    "series" : [
-      { "metric": "jobs_running", "color": "1e90ffa6", "label": "Run  ", "line_width": "1", "type": "stack" },
-      { "metric": "jobs_pending", "color": "afeeffa6", "label": "Pend ", "line_width": "1", "type": "stack" }
+      { "metric": "jobs_running", "color": "1e90ffa6", "label": "Run", "line_width": "1", "type": "stack" },
+      { "metric": "jobs_completing", "color": "87cefaa6", "label": "Comp", "line_width": "1", "type": "stack" },
+      { "metric": "jobs_pending", "color": "afeeffa6", "label": "Pend", "line_width": "1", "type": "stack" }
    ]
 }
