@@ -433,7 +433,7 @@ begin
     when '--node-patterns'
       $options.node_patterns += arg.split(',')
     when '--version'
-      $stdout.puts '2.0'
+      $stdout.puts '2.1'
       exit 0
     when '--help'
       $stdout.puts HELP

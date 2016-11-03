@@ -1,3 +1,10 @@
+ganglia-monitor-slurm (2.1-1) jessie; urgency=medium
+
+  [Victor Penso]
+  * Always send metric for all nodes, even with option -n
+
+ -- Victor Penso <vic.penso@gmail.com>  Thu, 03 Nov 2016 11:58:27 +0100
+
 ganglia-monitor-slurm (2.0-1) jessie; urgency=medium
 
   [Victor Penso]
