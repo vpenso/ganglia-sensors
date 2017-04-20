@@ -2,8 +2,8 @@ modules {
   module {
     name = "cvmfs_nioerr"
     language = "python"
-    param "Repository" {
-       value = "/cvmfs/alice.cern.ch"
+    param "repos" {
+       value = "/cvmfs/alice.cern.ch,/cvmfs/alice-ocdb.cern.ch"
     }
   }
 }
@@ -12,8 +12,12 @@ collection_group {
   collect_every = 100
   time_threshold = 300
   metric { 
-    name = "/cvmfs/alice.cern.ch" 
-    title = "/cvmfs/alice.cern.ch nioerr"
+    name_match = "cvmfs_nioerrors_cvmfs_alice.cern.ch" 
+    title = "IO Errors /cvmfs/alice.cern.ch"
+  }
+  metric { 
+    name = "cvmfs_nioerrors_cvmfs_alice-ocdb.cern.ch" 
+    title = "IO Errors /cvmfs/alice-ocdb.cern.ch"
   }
 }
 

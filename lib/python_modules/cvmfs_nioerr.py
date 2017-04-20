@@ -20,15 +20,15 @@ import re
 import os
 
 descriptors = list()
-#repository = "/cvmfs/alice.cern.ch"
 
-def attrqg(name):
+def attrqg(repository):
     '''Return the output of attr -qg nioerr repository, which is the
     total number of I/O errors encoutered since mounting.
     If a prior findmnt or cvmfs_config probe check fails, then return
     a negative value'''
-    repository = name.split('_')[-1]
-    repository = "/cvmfs/" + repository
+
+    # remove the prefix and substitute underscore
+    repository = repository.replace('cvmfs_nioerrors','').replace('_','/')
     findmnt_command = "findmnt -t fuse -S cvmfs2"
     probe_command = "/usr/bin/cvmfs_config probe " + repository
     attr_command = ["/usr/bin/attr", "-qg", "nioerr", repository]
@@ -59,31 +59,31 @@ def metric_init(params):
     global descriptors
     findmnt_command = "findmnt -t fuse -S cvmfs2"
 
-    all_repositories = list()
+    all_repositories = []
     if params:
-        for reponame in params:
-            all_repositories.append(params[reponame])
+        all_repositories = params["repos"].split(",")
     else:
         try:
             findmnt_out = subprocess.check_output(findmnt_command, shell=True)
             for mntline in findmnt_out.splitlines():
                 repo = mntline.split()[0]
                 if repo != "TARGET":
-                    all_repositories.append(repo.split('/')[-1])
+                    all_repositories.append(repo)
         except subprocess.CalledProcessError:
             return 0
 
     for repository in all_repositories:
+        name = 'cvmfs_nioerrors' + repository.replace('/','_')
         # we name the metric as the cvmfs repository it monitors
-	metric = {'name': 'cvmfs_nioerrors_' + repository,
-            'call_back': attrqg,
-            'time_max': 120,
-            'value_type': 'uint',
-            'units': 'N',
-            'slope': 'both',
-            'format': '%u',
-            'description': 'ioerrors for /cvmfs/' + repository,
-            'groups': 'cvmfs'}
+	metric = {'name': name,
+                  'call_back': attrqg,
+                  'time_max': 120,
+                  'value_type': 'uint',
+                  'units': 'N',
+                  'slope': 'both',
+                  'format': '%u',
+                  'description': 'ioerrors for ' + repository,
+                  'groups': 'cvmfs'}
         descriptors.append(metric)
 
     return descriptors
@@ -96,11 +96,9 @@ def metric_cleanup():
 
 #This code is for debugging and unit testing
 if __name__ == '__main__':
-    params = {'Repo1': 'alice-ocdb.cern.ch'}
-    params['Repo2'] = 'alice.cern.ch'
     #params = {}
+    params = { "repos": "/cvmfs/alice.cern.ch,/cvmfs/alice-ocdb.cern.ch" }
     metric_init(params)
     for d in descriptors:
         v = d['call_back'](d['name'])
         print 'value for %s is %u' % (d['name'],  v)
-
