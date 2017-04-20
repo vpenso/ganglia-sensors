@@ -18,8 +18,27 @@
 import subprocess
 import re
 import os
+import threading
 
 descriptors = list()
+
+def timeout_command(command_tokens, timeout_secs):
+    """ Launch the command received as argument as a timed process.
+
+    input: list of command strings, containing command name and command arguments
+    output: process returncode, stdout, stderr
+    The process return code is "-15" in case the command is timed out.
+    The use of process groups allows to kill also subprocesses (omitting to do this
+    in favor of a process.kill() or process.terminate() was letting the calling part hanging. """
+    kill = lambda process: os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+    wrapped_process = subprocess.Popen(command_tokens, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
+    timer = threading.Timer(timeout_secs, kill, [wrapped_process])
+    try:
+        timer.start()
+        stdout, stderr = wrapped_process.communicate()
+    finally:
+        timer.cancel()
+    return ([wrapped_process.returncode, stdout, stderr])
 
 def attrqg(repository):
     '''Return the output of attr -qg nioerr repository, which is the
@@ -29,21 +48,21 @@ def attrqg(repository):
 
     # remove the prefix and substitute underscore
     repository = repository.replace('cvmfs_nioerrors','').replace('_','/')
-    findmnt_command = "findmnt -t fuse -S cvmfs2"
-    probe_command = "/usr/bin/cvmfs_config probe " + repository
+    findmnt_command = ["findmnt", "-t", "fuse", "-S", "cvmfs2"]
+    probe_command = ["/usr/bin/cvmfs_config", "probe", repository]
     attr_command = ["/usr/bin/attr", "-qg", "nioerr", repository]
     try:
-        findmnt_out = subprocess.check_output(findmnt_command, shell=True)
+	[retcode, findmnt_out, err] = timeout_command(findmnt_command, 1)
         for mntline in findmnt_out.splitlines():
             if mntline.split()[0] == repository:
                 try:
-                    probe_out = subprocess.check_output(probe_command, shell=True)
+		    [retcode, probe_out, err] = timeout_command(probe_command, 3)
                     for line in probe_out.splitlines():
-                        #print "line is: ", line
                         if re.search(repository, line):
                             if re.search(r'OK', line):
                                 try:
-                                    nioerr = subprocess.Popen(attr_command, stdout=subprocess.PIPE).stdout.readlines()[0]
+				    [retcode, attr_out, err] = timeout_command(attr_command, 1)
+                                    nioerr = attr_out.splitlines()[0]
                                     return int(nioerr)
                                 except ValueError:
                                     return -1
@@ -57,14 +76,14 @@ def attrqg(repository):
 def metric_init(params):
     '''Create the metric definition dictionary object for the metric.'''
     global descriptors
-    findmnt_command = "findmnt -t fuse -S cvmfs2"
+    findmnt_command = ["findmnt", "-t", "fuse", "-S", "cvmfs2"]
 
     all_repositories = []
     if params:
         all_repositories = params["repos"].split(",")
     else:
         try:
-            findmnt_out = subprocess.check_output(findmnt_command, shell=True)
+	    [retcode, findmnt_out, err] = timeout_command(findmnt_command, 1)
             for mntline in findmnt_out.splitlines():
                 repo = mntline.split()[0]
                 if repo != "TARGET":
