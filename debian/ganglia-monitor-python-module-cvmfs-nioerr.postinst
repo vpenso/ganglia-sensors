@@ -1,0 +1,14 @@
+#!/bin/sh
+# postinst script for ganglia-monitor-python-module-cvmfs-nioerr
+
+set -e
+
+if test -x /etc/init.d/ganglia-monitor; then
+  which invoke-rc.d > /dev/null 2>&1 && invoke-rc.d ganglia-monitor restart
+else
+  which deb-systemd-invoke >/dev/null 2>&1 && deb-systemd-invoke restart ganglia-monitor.service
+fi
+
+#DEBHELPER#
+
+exit 0
