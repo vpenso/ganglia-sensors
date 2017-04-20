@@ -21,7 +21,7 @@ Module | Configuration  | Description
 -------|----------------|--------------
 [infiniband.py](lib/python_modules/infiniband.py) | [infiniband.pyconf](etc/conf.d/infiniband.pyconf) | Read Infiniband host channel performance metrics from `perfquery`
 [ipmi.py](lib/python_modules/infiniband.py) | [ipmi.pyconf](etc/conf.d/ipmi.pyconf) | Read the BMC sensors with `ipmitool`
-[cvmfs_nioerr.py]((lib/python_modules/cvmfs_nioerr.py)| [cvmfs_nioerr.pyconf](etc/conf.d/cvmfs_nioerr.pyconf) | Count I/O errors on CernVM-FS mounts
+[cvmfs_nioerr.py](lib/python_modules/cvmfs_nioerr.py)| [cvmfs_nioerr.pyconf](etc/conf.d/cvmfs_nioerr.pyconf) | Count I/O errors on CernVM-FS mounts
 
 ### Configuration
 
