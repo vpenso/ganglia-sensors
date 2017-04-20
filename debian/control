@@ -1,4 +1,4 @@
-Source: ganglia-monitor-slurm
+Source: ganglia-sensors
 Section: net
 Priority: optional
 Maintainer: Victor Penso <vic.penso@gmail.com>
@@ -12,6 +12,14 @@ Package: ganglia-monitor-slurm
 Architecture: all
 Depends: ${misc:Depends}, ganglia-monitor, ruby
 Suggests: slurm-client
-Description: GSI Ganglia SLURM sensor
- Monitors the GSI SLURM master and sends information
- to Ganglia with the gmetric cli.
+Description: Ganglia SLURM sensor
+ Monitors the SLURM master and sends information
+ to Ganglia with the gmetric CLI.
+
+Package: ganglia-monitor-python-module-cvmfs-nioerr
+Architecture: all
+Depends: ${misc:Depends}, ganglia-monitor-python, python
+Suggests: cvmfs-client
+Description: Ganglia Python module: CernVM-FS I/O errors
+  Ganglia sensor reporting I/O errors for file-systems
+  mounted using CernVM-FS.

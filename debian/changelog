@@ -1,34 +1,21 @@
-ganglia-monitor-slurm (2.1-1) jessie; urgency=medium
+ganglia-sensors (2.2) jessie; urgency=medium
+
+  [Victor Penso]
+  * Add package for CVMFS I/O errors
+
+ -- vpenso <vic.penso@gmail.com>  Thu, 20 Apr 2017 11:45:40 +0200
+
+ganglia-sensors (2.1-1) jessie; urgency=medium
 
   [Victor Penso]
   * Always send metric for all nodes, even with option -n
 
  -- Victor Penso <vic.penso@gmail.com>  Thu, 03 Nov 2016 11:58:27 +0100
 
-ganglia-monitor-slurm (2.0-1) jessie; urgency=medium
+ganglia-sensors (2.0-1) jessie; urgency=medium
 
   [Victor Penso]
   * Support scheduler metrics
   * Support node groups by command option
 
  -- Victor Penso <vic.penso@gmail.com>  Mon, 31 Oct 2016 13:33:33 +0100
-
-ganglia-monitor-slurm (1.0.2-1) unstable; urgency=medium
-
-  [ Dennis Klein ]
-  * Wait 15 seconds before restarting the sensor
-
- -- Dennis Klein <d.klein@gsi.de>  Tue, 04 Oct 2016 14:44:00 +0200
-
-ganglia-monitor-slurm (1.0.1-1) unstable; urgency=medium
-
-  [ Victor Penso ]
-  * Add couple of additional states to be monitored
-
- -- Victor Penso <v.penso@gsi.de>  Tue, 16 Aug 2016 14:16:21 +0200
-
-ganglia-monitor-slurm (1.0.0-1) unstable; urgency=low
-
-  * Initial release
-
- -- Dennis Klein <d.klein@gsi.de>  Mon, 25 Jul 2016 18:51:56 +0200
