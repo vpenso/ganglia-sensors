@@ -1,0 +1,19 @@
+modules {
+  module {
+    name = "cvmfs_nioerr"
+    language = "python"
+    param "Repository" {
+       value = "/cvmfs/alice.cern.ch"
+    }
+  }
+}
+
+collection_group {
+  collect_every = 100
+  time_threshold = 300
+  metric { 
+    name = "/cvmfs/alice.cern.ch" 
+    title = "/cvmfs/alice.cern.ch nioerr"
+  }
+}
+
