@@ -191,7 +191,7 @@ module Slurm
         line.split(' ').each do |elem|
 
           key,value = elem.split('=')
-          key = key.downcase
+          key = key.downcase unless key.nil?
           case key
           when 'nodename'
             #
