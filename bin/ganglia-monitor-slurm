@@ -25,9 +25,11 @@ require 'socket'
 require 'json'
 
 class Hash
+
   def self.autonew(*args)
     new(*args){|hsh, key| hsh[key] = Hash.new(&hsh.default_proc) }
   end
+
 end
 
 module System
@@ -64,6 +66,14 @@ module System
 end
 
 module Slurm
+  
+  def self.split(str, sep=':')
+    begin
+      return str.split(sep)[-1].to_i
+    rescue
+      return 0
+    end
+  end
 
   def self.sdiag
     # query information from Slurm
@@ -74,14 +84,15 @@ module Slurm
     lines = output.split("\n")
     # Extract required data
     metrics = Hash.new
-    metrics["#{prefix}_threads"] = lines[4].split(':')[-1].to_i
-    metrics["#{prefix}_queue_size"] = lines[5].split(':')[-1].to_i
-    metrics["#{prefix}_last_cycle"] = lines[12].split(':')[-1].to_i
-    metrics["#{prefix}_mean_cycle"] = lines[15].split(':')[-1].to_i
-    metrics["#{prefix}_cycle_per_minute"] = lines[17].split(':')[-1].to_i
-    metrics["#{prefix}_backfill_last_cycle"] = lines[24].split(':')[-1].to_i
-    metrics["#{prefix}_backfill_mean_cycle"] = lines[26].split(':')[-1].to_i
-    metrics["#{prefix}_backfill_depth_mean"] = lines[29].split(':')[-1].to_i
+    metrics["#{prefix}_threads"] = split(lines[4])
+    metrics["#{prefix}_queue_size"] = split(lines[5])
+    metrics["#{prefix}_last_cycle"] = split(lines[12])
+    metrics["#{prefix}_mean_cycle"] = split(lines[15])
+    metrics["#{prefix}_cycle_per_minute"] = split(lines[17])
+    metrics["#{prefix}_backfill_last_cycle"] = split(lines[24])
+    metrics["#{prefix}_backfill_mean_cycle"] = split(lines[26])
+    metrics["#{prefix}_backfill_depth_mean"] = split(lines[29])
+    metrics["#{prefix}_backfill_depth_mean"] = split(lines[29])
     return metrics
   end
 
@@ -433,7 +444,7 @@ begin
     when '--node-patterns'
       $options.node_patterns += arg.split(',')
     when '--version'
-      $stdout.puts '2.1'
+      $stdout.puts '2.2'
       exit 0
     when '--help'
       $stdout.puts HELP
