@@ -1,3 +1,10 @@
+ganglia-sensors (2.3) jessie; urgency=medium
+
+  [Victor Penso]
+  * [BUG] make sure scheduler metrics are collected, even if backfilling … 
+
+ -- vpenso <vic.penso@gmail.com>  Thu, 04 Dec 2018 08:56:40 +0200
+
 ganglia-sensors (2.2) jessie; urgency=medium
 
   [Victor Penso]

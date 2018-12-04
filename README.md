@@ -125,7 +125,7 @@ Deploy custom composite graphs:
 Create Debian package with the configuration in [debian/](debian/)
 
 ```
-apt -y install debhelper devscripts
+apt -y install build-essential debhelper devscripts dh-systemd
 dch -i                                             # adjust changelog if required
 dpkg-buildpackage -b -us -uc -tc                   # build package
 dpkg -c ../ganglia-monitor-slurm_*_all.deb         # list package content
